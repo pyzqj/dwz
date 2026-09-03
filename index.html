@@ -336,6 +336,24 @@
       专为私域流量打造的轻量级边缘解决方案。基于全球分布式边缘云原生架构，内置高性能分布式 KV 键值数据库与 Blob 对象存储，零服务器运维，毫秒级全球加速。
     </p>
 
+    <!-- 1-Click Short URL Generator on Homepage -->
+    <div style="width: 100%; max-width: 680px; margin: 0 auto 32px; background: rgba(255,255,255,0.04); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 20px;">
+      <form id="homeDwzForm" onsubmit="handleHomeDwzSubmit(event)" style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <input type="url" id="homeLongUrl" placeholder="粘贴长链接一键生成短网址 (如 https://example.com)..." required style="flex: 1; min-width: 240px; padding: 14px 18px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.15); background: rgba(15,23,42,0.7); color: #ffffff; font-size: 14px; outline: none;">
+        <button type="submit" id="homeSubmitBtn" class="btn btn-primary" style="padding: 14px 24px; font-size: 14px; white-space: nowrap;">⚡ 极速生成</button>
+      </form>
+
+      <div id="homeDwzResult" style="display: none; margin-top: 14px; padding: 12px 16px; background: rgba(34,197,94,0.12); border: 1px solid rgba(34,197,94,0.3); border-radius: 8px; text-align: left;">
+        <div style="font-size: 12px; color: #86efac; margin-bottom: 4px;">🎉 短网址生成成功 (已自动复制到剪贴板)：</div>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
+          <a id="homeShortUrlLink" href="#" target="_blank" style="font-size: 16px; font-weight: 700; color: #60a5fa; text-decoration: underline;"></a>
+          <button type="button" class="btn btn-outline" onclick="copyHomeShortUrl()" style="padding: 6px 14px; font-size: 12px;">📋 复制</button>
+        </div>
+      </div>
+
+      <div id="homeDwzError" style="display: none; margin-top: 12px; padding: 10px 14px; background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); border-radius: 8px; font-size: 13px; color: #fca5a5; text-align: left;"></div>
+    </div>
+
     <div class="hero-actions">
       <a href="/console/" class="btn btn-primary" style="padding: 14px 32px; font-size: 16px;">
         🚀 进入智能控制台
@@ -346,6 +364,55 @@
       </a>
     </div>
   </main>
+
+  <script>
+    async function handleHomeDwzSubmit(e) {
+      e.preventDefault();
+      const input = document.getElementById("homeLongUrl");
+      const btn = document.getElementById("homeSubmitBtn");
+      const resultBox = document.getElementById("homeDwzResult");
+      const errorBox = document.getElementById("homeDwzError");
+      const link = document.getElementById("homeShortUrlLink");
+
+      resultBox.style.display = "none";
+      errorBox.style.display = "none";
+      btn.disabled = true;
+      btn.textContent = "生成中...";
+
+      try {
+        const res = await fetch("/api/dwz/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: input.value.trim() }),
+        });
+        const data = await res.json();
+        if (res.status === 200 && data.code === 200) {
+          link.textContent = data.data.shortUrl;
+          link.href = data.data.shortUrl;
+          resultBox.style.display = "block";
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(data.data.shortUrl).catch(() => {});
+          }
+        } else {
+          errorBox.textContent = data.msg || "生成失败，系统未开放公开生成权限";
+          errorBox.style.display = "block";
+        }
+      } catch (err) {
+        errorBox.textContent = "请求失败: " + err.message;
+        errorBox.style.display = "block";
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "⚡ 极速生成";
+      }
+    }
+
+    function copyHomeShortUrl() {
+      const url = document.getElementById("homeShortUrlLink").textContent;
+      if (url && navigator.clipboard) {
+        navigator.clipboard.writeText(url).then(() => alert("短网址已复制到剪贴板！"));
+      }
+    }
+  </script>
 
   <!-- Features -->
   <section class="features-section">

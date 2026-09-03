@@ -72,9 +72,10 @@ async function runTests() {
   console.assert(session && session.username === "admin", "Session verification failed");
   console.log("✓ Session token generation and verification passed\n");
 
-  // 4. Test Short URL Logic & 1-Click Generation
-  console.log("--- 4. Testing Short URL Business Logic & 1-Click Generation ---");
-  const randomKey = Math.random().toString(36).substring(2, 8);
+  // 4. Test Short URL Logic & 3-Char Auto Key Generation
+  console.log("--- 4. Testing Short URL Business Logic & 3-Char Auto Key Generation ---");
+  const randomKey = Math.random().toString(36).substring(2, 5); // 3 characters
+  console.assert(randomKey.length === 3, "3-char key failed");
   const targetLongUrl = "https://cloud.tencent.com/document/product/1552/127420";
   const autoTitle = `${new URL(targetLongUrl).hostname}_${randomKey}`;
   const dwzData = {
@@ -92,8 +93,15 @@ async function runTests() {
 
   const fetchedDwz = await kv.getJSON(`dwz_key_${randomKey}`);
   console.assert(fetchedDwz.url === targetLongUrl, "Dwz fetch failed");
+  console.assert(fetchedDwz.key.length === 3, "Key length must be 3");
   console.assert(fetchedDwz.title.includes("cloud.tencent.com"), "Auto title generation failed");
-  console.log(`✓ 1-Click Short URL auto-generation passed: ${randomKey} -> ${fetchedDwz.url}`);
+  console.log(`✓ 3-Character Short URL generation passed: ${randomKey} -> ${fetchedDwz.url}`);
+
+  // Test Public Homepage DWZ Switch
+  await kv.put("public_dwz_allowed", "1");
+  const isPublicAllowed = (await kv.get("public_dwz_allowed")) === "1";
+  console.assert(isPublicAllowed === true, "Public switch failed");
+  console.log(`✓ Global Public DWZ Homepage switch verified: enabled = ${isPublicAllowed}`);
 
   // 5. Test Group Live Code Subcode Rotation Logic
   console.log("--- 5. Testing Group Live Code Threshold Rotation ---");

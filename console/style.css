@@ -414,6 +414,27 @@ body {
   border: 1px solid var(--border-color);
   box-shadow: var(--shadow-sm);
   margin-bottom: 24px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.table-scroll-hint {
+  display: none;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  padding: 6px 12px;
+  border-bottom: 1px solid #dbeafe;
+}
+
+@media (max-width: 900px) {
+  .table-scroll-hint {
+    display: block;
+  }
 }
 
 .section-header {
@@ -455,9 +476,14 @@ body {
 
 /* Responsive Table Wrapper with Horizontal Scroll */
 .table-responsive {
+  display: block;
   width: 100%;
-  overflow-x: auto;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto !important;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+  position: relative;
 }
 
 .table-responsive::-webkit-scrollbar {
@@ -471,7 +497,7 @@ body {
 
 table {
   width: 100%;
-  min-width: 820px; /* Guarantees columns will never be clipped or forced wrap */
+  min-width: 860px; /* Guarantees columns will never be clipped or forced wrap */
   border-collapse: collapse;
   text-align: left;
 }
@@ -834,12 +860,14 @@ input:checked + .slider:before {
 }
 
 .iphone-frame {
-  width: 320px;
-  height: 600px;
+  width: 340px;
+  max-width: 90vw;
+  height: 640px;
+  max-height: 82vh;
   border: 10px solid #1e293b;
   border-radius: 40px;
   overflow: hidden;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
   background: #ededed;
   position: relative;
 }
@@ -1224,4 +1252,104 @@ html, body {
     padding: 24px 18px;
     max-width: 95vw;
   }
+}
+
+/* ============================================================= */
+/* 📤 Enhanced Image Upload & Real Progress Bar Styles          */
+/* ============================================================= */
+.upload-dropzone-box {
+  border: 2px dashed #cbd5e1;
+  border-radius: var(--radius-lg);
+  padding: 32px 20px;
+  text-align: center;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  margin-bottom: 20px;
+}
+.upload-dropzone-box:hover, .upload-dropzone-box.dragover {
+  border-color: var(--primary);
+  background: #f0f7ff;
+}
+
+.upload-progress-container {
+  display: none;
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow-sm);
+  animation: fadeIn 0.25s ease;
+}
+.upload-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.upload-progress-track {
+  width: 100%;
+  height: 10px;
+  background: #f1f5f9;
+  border-radius: 5px;
+  overflow: hidden;
+  position: relative;
+}
+.upload-progress-fill {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb, #38bdf8);
+  border-radius: 5px;
+  transition: width 0.15s ease;
+}
+.upload-progress-detail {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* ============================================================= */
+/* 🎛️ Toggle Switch Component                                    */
+/* ============================================================= */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 26px;
+}
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #cbd5e1;
+  transition: .3s;
+  border-radius: 26px;
+}
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: .3s;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+input:checked + .slider {
+  background-color: var(--primary);
+}
+input:checked + .slider:before {
+  transform: translateX(22px);
 }

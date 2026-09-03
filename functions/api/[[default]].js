@@ -33,6 +33,21 @@ const MIME_TYPES = {
   pdf: "application/pdf",
 };
 
+async function generateAutoShortKey(kv) {
+  let length = 3;
+  while (length <= 8) {
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const candidate = getRandomKey(length);
+      const exists = await kv.getJSON(`dwz_key_${candidate}`);
+      if (!exists) {
+        return candidate;
+      }
+    }
+    length++;
+  }
+  return getRandomKey(6);
+}
+
 export default async function onRequest(context) {
   const { request } = context;
   const url = new URL(request.url);
@@ -114,6 +129,12 @@ export default async function onRequest(context) {
     return { ok: false };
   }
 
+  // Public config check for client
+  if (path === "/system/public-config" && method === "GET") {
+    const publicAllowed = (await kv.get("public_dwz_allowed")) === "1";
+    return jsonResponse({ code: 200, data: { public_dwz_allowed: publicAllowed } });
+  }
+
   // -------------------------------------------------------------
   // Public Auth Routes
   // -------------------------------------------------------------
@@ -167,12 +188,16 @@ export default async function onRequest(context) {
   }
 
   // -------------------------------------------------------------
-  // ⚡ Open API for Short URLs (dwz/create supports GET & POST)
+  // ⚡ Short URLs Creation (dwz/create supports GET & POST)
+  // Supports Public Homepage Generation if enabled in settings
   // -------------------------------------------------------------
   if (path === "/dwz/create" && (method === "POST" || method === "GET")) {
     const auth = await checkAuth();
     if (!auth.ok) {
-      return jsonResponse({ code: 401, msg: "未授权，请提供有效登录凭证或 API Key (X-API-Key)" }, 401);
+      const publicAllowed = (await kv.get("public_dwz_allowed")) === "1";
+      if (!publicAllowed) {
+        return jsonResponse({ code: 401, msg: "未授权：公开免登录生成短网址未开放，请登录后台生成" }, 401);
+      }
     }
 
     let targetUrl, title, key, type, format;
@@ -207,16 +232,16 @@ export default async function onRequest(context) {
 
     key = (key || "").trim();
     if (!key) {
-      key = getRandomKey(6);
+      // 默认 3 个字符，如果用完了自动自适应增加长度
+      key = await generateAutoShortKey(kv);
     } else {
       if (!/^[a-zA-Z0-9_-]{2,32}$/.test(key)) {
         return jsonResponse({ code: 400, msg: "自定义短链仅限2-32位字母数字或下划线横线" }, 400);
       }
-    }
-
-    const existing = await kv.getJSON(`dwz_key_${key}`);
-    if (existing) {
-      return jsonResponse({ code: 400, msg: `短链 Key [${key}] 已被占用，请更换` }, 400);
+      const existing = await kv.getJSON(`dwz_key_${key}`);
+      if (existing) {
+        return jsonResponse({ code: 400, msg: `短链 Key [${key}] 已被占用，请更换` }, 400);
+      }
     }
 
     let autoTitle = (title || "").trim();
@@ -294,6 +319,28 @@ export default async function onRequest(context) {
     const newKey = "el_sec_" + getRandomKey(16);
     await kv.put("system_api_key", newKey);
     return jsonResponse({ code: 200, msg: "API Key 重置成功", data: { apiKey: newKey } });
+  }
+
+  // System Settings (Public Generation Switch)
+  if (path === "/system/settings" && method === "GET") {
+    const publicAllowed = (await kv.get("public_dwz_allowed")) === "1";
+    return jsonResponse({
+      code: 200,
+      data: {
+        public_dwz_allowed: publicAllowed,
+      },
+    });
+  }
+
+  if (path === "/system/settings" && method === "POST") {
+    const body = await request.json();
+    const isAllowed = body.public_dwz_allowed ? "1" : "0";
+    await kv.put("public_dwz_allowed", isAllowed);
+    return jsonResponse({
+      code: 200,
+      msg: isAllowed === "1" ? "已开启首页免登录直接生成短网址" : "已关闭首页免登录生成短网址",
+      data: { public_dwz_allowed: isAllowed === "1" },
+    });
   }
 
   // Change Password

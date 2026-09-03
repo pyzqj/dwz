@@ -215,6 +215,7 @@
           </div>
 
           <div class="card-table">
+            <div class="table-scroll-hint">👈 左右滑动查看完整操作按钮与详情 👉</div>
             <div class="table-responsive">
               <table>
                 <thead>
@@ -246,6 +247,7 @@
           </div>
 
           <div class="card-table">
+            <div class="table-scroll-hint">👈 左右滑动查看完整操作按钮与详情 👉</div>
             <div class="table-responsive">
               <table>
                 <thead>
@@ -270,13 +272,34 @@
         <section class="tab-pane" id="tab-blob">
           <div class="section-header">
             <div>
-              <h3 class="section-title">🖼️ 已上传素材 (云存储全盘托管)</h3>
-              <p style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">展示存储桶中所有已上传的图片对象，点击可快速复制直链</p>
+              <h3 class="section-title">🖼️ 素材库 (云存储全盘托管)</h3>
+              <p style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">展示存储桶中所有已上传的图片对象，点击卡片可快速预览或一键复制直链</p>
             </div>
-            <label class="btn btn-primary" style="cursor: pointer;">
-              <span>+ 上传新图片</span>
-              <input type="file" accept="image/*" multiple style="display: none;" onchange="handleBlobUpload(event)">
-            </label>
+            <button class="btn btn-primary" onclick="document.getElementById('blobFileInput').click()">+ 上传新图片</button>
+          </div>
+
+          <!-- Drag & Drop Upload Zone -->
+          <div class="upload-dropzone-box" id="blobDropzone" onclick="document.getElementById('blobFileInput').click()">
+            <input type="file" id="blobFileInput" accept="image/*" multiple style="display: none;" onchange="handleBlobUpload(event)">
+            <div style="font-size: 38px; color: var(--primary); margin-bottom: 8px;">☁️</div>
+            <h4 style="font-size: 15px; font-weight: 700; color: var(--text-main); margin-bottom: 4px;">点击选择图片，或将图片文件直接拖拽至此处</h4>
+            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">支持多选批量上传 PNG、JPG、JPEG、WebP、GIF 格式图片</p>
+            <span class="btn btn-primary btn-sm" style="pointer-events: none;">+ 浏览选择本地图片</span>
+          </div>
+
+          <!-- Upload Real-time Progress Bar Card -->
+          <div class="upload-progress-container" id="uploadProgressCard">
+            <div class="upload-progress-header">
+              <span id="uploadProgressTitle" style="color: var(--text-main);">正在上传图片 (1/1)...</span>
+              <span id="uploadProgressPercent" style="color: var(--primary); font-weight: 700;">0%</span>
+            </div>
+            <div class="upload-progress-track">
+              <div class="upload-progress-fill" id="uploadProgressBar"></div>
+            </div>
+            <div class="upload-progress-detail">
+              <span id="uploadProgressFileName">等待上传...</span>
+              <span id="uploadProgressSpeed">正在写入边缘存储...</span>
+            </div>
           </div>
 
           <div id="blobGalleryContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px;">
@@ -348,7 +371,25 @@
 
         <!-- Tab 6: System Settings -->
         <section class="tab-pane" id="tab-settings">
-          <div class="card-table" style="max-width: 600px; padding: 32px;">
+          <!-- Public Access Strategy Card -->
+          <div class="card-table" style="max-width: 620px; padding: 28px; margin-bottom: 24px;">
+            <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 6px;">🌐 全局公开访问配置</h3>
+            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 18px;">配置访客在官网首页无需登录时可直接使用的功能</p>
+
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 16px; background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-md); gap: 16px;">
+              <div>
+                <strong style="font-size: 14px; color: var(--text-main); display: block;">允许在首页免登录生成短网址</strong>
+                <span style="font-size: 12px; color: var(--text-muted); display: block; margin-top: 4px;">开启后，访客可在系统首页无需输入管理员密码直接粘贴长链接生成短网址；关闭后仅限管理员后台登录生成。</span>
+              </div>
+              <label class="switch" style="flex-shrink: 0; cursor: pointer;">
+                <input type="checkbox" id="publicDwzSwitch" onchange="togglePublicDwzSetting(this.checked)">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Password Change Card -->
+          <div class="card-table" style="max-width: 620px; padding: 28px;">
             <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px;">修改管理员密码</h3>
             <form id="passwordForm" onsubmit="handleChangePassword(event)">
               <div class="form-group">

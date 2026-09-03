@@ -145,6 +145,7 @@ function switchTab(tabId) {
   if (tabId === "qun") loadQunList();
   if (tabId === "blob") loadBlobList();
   if (tabId === "api") loadApiDocs();
+  if (tabId === "settings") loadSystemSettings();
 }
 
 // Copy to Clipboard
@@ -983,14 +984,47 @@ async function deleteZima(zm_id) {
 // -------------------------------------------------------------
 // EdgeOne Blob 素材库 (Discovers all buckets and files)
 // -------------------------------------------------------------
+function uploadFileToBlobWithProgress(file, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const formData = new FormData();
+    formData.append("file", file);
+
+    xhr.upload.addEventListener("progress", (e) => {
+      if (e.lengthComputable && typeof onProgress === "function") {
+        const pct = Math.round((e.loaded / e.total) * 100);
+        onProgress(pct, e.loaded, e.total);
+      }
+    });
+
+    xhr.addEventListener("load", () => {
+      try {
+        const res = JSON.parse(xhr.responseText);
+        if (xhr.status >= 200 && xhr.status < 300 && res.code === 200) {
+          resolve(res.data.url);
+        } else {
+          reject(new Error(res.msg || "文件上传失败"));
+        }
+      } catch (err) {
+        reject(new Error("解析响应失败"));
+      }
+    });
+
+    xhr.addEventListener("error", () => reject(new Error("网络传输异常")));
+    xhr.addEventListener("abort", () => reject(new Error("上传已被取消")));
+
+    const token = localStorage.getItem("dwz_token");
+    xhr.open("POST", "/api/upload");
+    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    xhr.send(formData);
+  });
+}
+
 async function uploadFileToBlob(file) {
-  const formData = new FormData();
-  formData.append("file", file);
-  const res = await apiRequest("/api/upload", "POST", formData);
-  if (res && res.code === 200) {
-    return res.data.url;
-  } else {
-    showToast(res?.msg || "文件上传失败", "error");
+  try {
+    return await uploadFileToBlobWithProgress(file);
+  } catch (e) {
+    showToast(e.message || "上传失败", "error");
     return null;
   }
 }
@@ -1011,7 +1045,7 @@ function renderBlobGallery(list) {
     container.innerHTML = `
       <div class="empty-state" style="grid-column: 1/-1;">
         <div class="empty-icon">🖼️</div>
-        <p>暂无素材图片。系统首次上传文件时会自动创建存储桶，也可点击右上角上传新图片</p>
+        <p>暂无素材图片。可将图片直接拖入上方虚线框或点击上传</p>
       </div>
     `;
     return;
@@ -1051,16 +1085,79 @@ function renderBlobGallery(list) {
 }
 
 async function handleBlobUpload(e) {
-  const files = e.target.files;
+  const files = e.target ? e.target.files : e;
   if (!files || files.length === 0) return;
 
-  showToast(`正在上传 ${files.length} 个文件至云存储...`, "info");
-  for (let i = 0; i < files.length; i++) {
-    await uploadFileToBlob(files[i]);
+  const total = files.length;
+  const progressCard = document.getElementById("uploadProgressCard");
+  const progressTitle = document.getElementById("uploadProgressTitle");
+  const progressPercent = document.getElementById("uploadProgressPercent");
+  const progressBar = document.getElementById("uploadProgressBar");
+  const progressFileName = document.getElementById("uploadProgressFileName");
+  const progressSpeed = document.getElementById("uploadProgressSpeed");
+
+  if (progressCard) progressCard.style.display = "block";
+
+  let successCount = 0;
+  for (let i = 0; i < total; i++) {
+    const file = files[i];
+    if (progressTitle) progressTitle.textContent = `正在上传第 ${i + 1}/${total} 个素材...`;
+    if (progressFileName) progressFileName.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+    if (progressSpeed) progressSpeed.textContent = "正在传输数据并写入云端存储...";
+
+    try {
+      await uploadFileToBlobWithProgress(file, (pct) => {
+        const overall = Math.round(((i + pct / 100) / total) * 100);
+        if (progressPercent) progressPercent.textContent = `${overall}%`;
+        if (progressBar) progressBar.style.width = `${overall}%`;
+      });
+      successCount++;
+    } catch (err) {
+      showToast(`文件 [${file.name}] 上传失败: ${err.message}`, "error");
+    }
   }
-  showToast("上传完成！");
-  e.target.value = "";
-  loadBlobList();
+
+  if (progressTitle) progressTitle.textContent = `🎉 上传完成！成功上传 ${successCount}/${total} 个素材`;
+  if (progressPercent) progressPercent.textContent = "100%";
+  if (progressBar) progressBar.style.width = "100%";
+  if (progressSpeed) progressSpeed.textContent = "已写入云存储";
+
+  showToast(`已成功上传 ${successCount} 个文件至素材库`);
+  if (e.target && e.target.value) e.target.value = "";
+
+  setTimeout(() => {
+    if (progressCard) progressCard.style.display = "none";
+    loadBlobList();
+  }, 1200);
+}
+
+function initBlobDropzone() {
+  const dropzone = document.getElementById("blobDropzone");
+  if (!dropzone) return;
+
+  ["dragenter", "dragover"].forEach((eventName) => {
+    dropzone.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropzone.classList.add("dragover");
+    });
+  });
+
+  ["dragleave", "drop"].forEach((eventName) => {
+    dropzone.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropzone.classList.remove("dragover");
+    });
+  });
+
+  dropzone.addEventListener("drop", (e) => {
+    const dt = e.dataTransfer;
+    const files = dt.files;
+    if (files && files.length > 0) {
+      handleBlobUpload(files);
+    }
+  });
 }
 
 async function deleteBlobItem(key) {
@@ -1194,7 +1291,32 @@ function openPhoneSimulator(targetUrl) {
   document.getElementById("phoneSimulatorModal").classList.add("show");
 }
 
+// -------------------------------------------------------------
+// System Settings (Public Generation Switch)
+// -------------------------------------------------------------
+async function loadSystemSettings() {
+  const res = await apiRequest("/api/system/settings");
+  if (res && res.data) {
+    const sw = document.getElementById("publicDwzSwitch");
+    if (sw) sw.checked = !!res.data.public_dwz_allowed;
+  }
+}
+
+async function togglePublicDwzSetting(checked) {
+  const res = await apiRequest("/api/system/settings", "POST", {
+    public_dwz_allowed: checked,
+  });
+  if (res && res.code === 200) {
+    showToast(res.msg);
+  } else {
+    showToast(res?.msg || "保存系统设置失败", "error");
+    const sw = document.getElementById("publicDwzSwitch");
+    if (sw) sw.checked = !checked;
+  }
+}
+
 // Global Initialization
 window.addEventListener("DOMContentLoaded", () => {
   checkAuth();
+  initBlobDropzone();
 });

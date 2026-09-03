@@ -116,8 +116,8 @@ function renderQunPage(qunItem, activeZima, isKfFallback = false, cookieHeaderTo
       background: #ffffff;
       border-radius: 16px;
       width: 100%;
-      max-width: 390px;
-      padding: 32px 24px 28px;
+      max-width: 380px;
+      padding: 24px 18px 22px;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
       text-align: center;
       position: relative;
@@ -160,8 +160,9 @@ function renderQunPage(qunItem, activeZima, isKfFallback = false, cookieHeaderTo
 
     /* 二维码展示区 */
     .qrcode-wrapper {
-      width: 250px;
-      height: 250px;
+      width: 210px;
+      height: 210px;
+      max-width: 100%;
       margin: 10px auto 16px;
       border-radius: 12px;
       padding: 8px;
