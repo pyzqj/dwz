@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+  <title>EdgeOne 智能控制台 | 短网址与群活码系统</title>
+  <link rel="shortcut icon" href="../static/img/favicon.ico">
+  <link rel="stylesheet" href="./style.css">
+  <script src="../static/js/qrcode.min.js"></script>
+</head>
+<body>
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Login Overlay -->
+  <div class="auth-overlay" id="authOverlay" style="display: none;">
+    <div class="auth-card">
+      <div class="logo-badge">⚡</div>
+      <h2>EdgeOne 智能控制台</h2>
+      <p>短网址 & 群活码边缘调度管理系统</p>
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <div class="form-group" style="text-align: left;">
+          <label class="form-label">管理员账号</label>
+          <input type="text" id="loginUsername" class="form-input" placeholder="默认 admin" value="admin" required>
+        </div>
+        <div class="form-group" style="text-align: left;">
+          <label class="form-label">管理员密码</label>
+          <input type="password" id="loginPassword" class="form-input" placeholder="默认 admin123" required>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; margin-top: 10px;">立即登录控制台</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="app-container">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo-badge">🚀</div>
+        <div class="logo-text">
+          <h1>引流宝 EdgeOne</h1>
+          <p>KV & Blob 原生架构</p>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <button class="nav-item active" data-tab="overview" onclick="switchTab('overview')">
+          <span class="icon">📊</span>
+          <span>概览面板</span>
+        </button>
+        <button class="nav-item" data-tab="dwz" onclick="switchTab('dwz')">
+          <span class="icon">🔗</span>
+          <span>短网址管理</span>
+        </button>
+        <button class="nav-item" data-tab="qun" onclick="switchTab('qun')">
+          <span class="icon">👥</span>
+          <span>群活码管理</span>
+        </button>
+        <button class="nav-item" data-tab="blob" onclick="switchTab('blob')">
+          <span class="icon">🖼️</span>
+          <span>Blob 素材库</span>
+        </button>
+        <button class="nav-item" data-tab="settings" onclick="switchTab('settings')">
+          <span class="icon">⚙️</span>
+          <span>系统设置</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <span>v3.0.0 EdgeOne</span>
+        <button onclick="handleLogout()" style="background: none; border: none; color: #94a3b8; cursor: pointer;" title="退出登录">🚪 退出</button>
+      </div>
+    </aside>
+
+    <!-- Main Content Wrapper -->
+    <main class="main-wrapper">
+      <!-- Top Sticky Header -->
+      <header class="top-header">
+        <div class="header-left">
+          <h2 class="page-title" id="currentPageTitle">概览面板</h2>
+        </div>
+        <div class="header-right">
+          <div class="status-pill">
+            <span class="status-dot"></span>
+            <span id="runtimeStatusBadge">边缘节点在线</span>
+          </div>
+          <div class="user-badge">
+            <span>👤</span>
+            <span id="headerUsername">admin</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Content Views -->
+      <div class="content-body">
+        
+        <!-- Tab 1: Overview Panel -->
+        <section class="tab-pane active" id="tab-overview">
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <div class="metric-info">
+                <h3>短网址总数</h3>
+                <div class="metric-val" id="statTotalDwz">0</div>
+                <div class="metric-sub">今日点击: <strong id="statTodayDwzPv">0</strong></div>
+              </div>
+              <div class="metric-icon icon-blue">🔗</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-info">
+                <h3>群活码总数</h3>
+                <div class="metric-val" id="statTotalQun">0</div>
+                <div class="metric-sub">今日扫码: <strong id="statTodayQunPv">0</strong></div>
+              </div>
+              <div class="metric-icon icon-green">👥</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-info">
+                <h3>全站总访问 PV</h3>
+                <div class="metric-val" id="statTotalPv">0</div>
+                <div class="metric-sub">今日全站: <strong id="statTodayPv">0</strong></div>
+              </div>
+              <div class="metric-icon icon-purple">📈</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-info">
+                <h3>底层存储架构</h3>
+                <div class="metric-val" style="font-size: 20px; color: var(--primary);">EdgeOne</div>
+                <div class="metric-sub">KV 键值 + Blob 对象</div>
+              </div>
+              <div class="metric-icon icon-orange">⚡</div>
+            </div>
+          </div>
+
+          <!-- Quick Actions and Guide Card -->
+          <div class="card-table" style="padding: 24px; margin-bottom: 24px;">
+            <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 12px;">快捷入口</h3>
+            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+              <button class="btn btn-primary" onclick="openCreateDwzModal()">+ 新建短网址</button>
+              <button class="btn btn-primary" onclick="openCreateQunModal()">+ 新建群活码</button>
+              <button class="btn btn-secondary" onclick="switchTab('blob')">📁 管理 Blob 素材</button>
+              <a href="../" target="_blank" class="btn btn-secondary">🌐 访问系统首页</a>
+            </div>
+          </div>
+
+          <!-- System Architecture Info -->
+          <div class="card-table" style="padding: 24px;">
+            <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 12px;">☁️ 腾讯云 EdgeOne 部署指南</h3>
+            <p style="font-size: 14px; color: var(--text-muted); line-height: 1.8;">
+              本系统专为 <strong>腾讯云 EdgeOne Pages (Makers)</strong> 原生定制：<br>
+              1. <strong>KV 数据库</strong>：所有短链映射、活码配置与访问量均存储在 EdgeOne KV 中，全球 60s 内自动分发同步。<br>
+              2. <strong>Blob 文件存储</strong>：所有上传的微信群二维码均保存在 EdgeOne Blob 中，通过 <code>/api/blob/*</code> 全球 CDN 毫秒级加速回显。<br>
+              3. <strong>设备分流与防封</strong>：支持微信客户端专属引导、移动端专属分流、多群子码自动阈值切换及去重机制。
+            </p>
+          </div>
+        </section>
+
+        <!-- Tab 2: Short URL Management -->
+        <section class="tab-pane" id="tab-dwz">
+          <div class="section-header">
+            <div class="search-bar">
+              <input type="text" id="dwzSearchInput" class="search-input" placeholder="搜索短网址标题、Key 或目标链接..." oninput="filterDwz()">
+            </div>
+            <button class="btn btn-primary" onclick="openCreateDwzModal()">+ 新建短网址</button>
+          </div>
+
+          <div class="card-table">
+            <div class="table-responsive">
+              <table>
+                <thead>
+                  <tr>
+                    <th>标题 / 创建时间</th>
+                    <th>短链 Key</th>
+                    <th>目标链接 (URL)</th>
+                    <th>分流模式</th>
+                    <th>总访问 / 今日</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="dwzTableBody">
+                  <tr><td colspan="7" class="empty-state"><div class="empty-icon">⏳</div><p>正在加载短网址列表...</p></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Tab 3: Group Live Code Management -->
+        <section class="tab-pane" id="tab-qun">
+          <div class="section-header">
+            <div class="search-bar">
+              <input type="text" id="qunSearchInput" class="search-input" placeholder="搜索群活码标题..." oninput="filterQun()">
+            </div>
+            <button class="btn btn-primary" onclick="openCreateQunModal()">+ 新建群活码</button>
+          </div>
+
+          <div class="card-table">
+            <div class="table-responsive">
+              <table>
+                <thead>
+                  <tr>
+                    <th>群活码名称 / 创建时间</th>
+                    <th>子码池</th>
+                    <th>安全认证 / 去重</th>
+                    <th>总访问 / 今日</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="qunTableBody">
+                  <tr><td colspan="6" class="empty-state"><div class="empty-icon">⏳</div><p>正在加载群活码列表...</p></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Tab 4: Blob Materials Library -->
+        <section class="tab-pane" id="tab-blob">
+          <div class="section-header">
+            <h3 class="section-title">🖼️ 已上传素材 (EdgeOne Blob)</h3>
+            <label class="btn btn-primary" style="cursor: pointer;">
+              <span>+ 上传新图片到 Blob</span>
+              <input type="file" accept="image/*" multiple style="display: none;" onchange="handleBlobUpload(event)">
+            </label>
+          </div>
+
+          <div id="blobGalleryContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px;">
+            <div class="empty-state" style="grid-column: 1/-1;"><p>正在读取 Blob 存储桶...</p></div>
+          </div>
+        </section>
+
+        <!-- Tab 5: System Settings -->
+        <section class="tab-pane" id="tab-settings">
+          <div class="card-table" style="max-width: 600px; padding: 32px;">
+            <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px;">修改管理员密码</h3>
+            <form id="passwordForm" onsubmit="handleChangePassword(event)">
+              <div class="form-group">
+                <label class="form-label">当前原密码</label>
+                <input type="password" id="oldPasswordInput" class="form-input" placeholder="请输入当前密码" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">新密码</label>
+                <input type="password" id="newPasswordInput" class="form-input" placeholder="不少于5位的新密码" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">确认新密码</label>
+                <input type="password" id="confirmPasswordInput" class="form-input" placeholder="再次输入新密码" required>
+              </div>
+              <button type="submit" class="btn btn-primary">确认修改密码</button>
+            </form>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal: Create/Edit Short URL -->
+  <div class="modal-backdrop" id="dwzModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="dwzModalTitle">新建短网址</h3>
+        <button class="modal-close" onclick="closeModal('dwzModal')">&times;</button>
+      </div>
+      <form id="dwzForm" onsubmit="handleDwzSubmit(event)">
+        <div class="modal-body">
+          <input type="hidden" id="dwzFormKey">
+          
+          <div class="form-group">
+            <label class="form-label">短网址标题</label>
+            <input type="text" id="dwzFormTitle" class="form-input" placeholder="例如：官网推广链接" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">目标链接 (URL) <small>访客实际跳转的完整地址</small></label>
+            <input type="url" id="dwzFormUrl" class="form-input" placeholder="https://..." required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">短链 Key <small>留空系统将随机生成6位字符</small></label>
+            <input type="text" id="dwzFormKeyInput" class="form-input" placeholder="例如：vip2026">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">跳转模式</label>
+            <select id="dwzFormType" class="form-select" onchange="handleDwzTypeChange()">
+              <option value="1">1. 通用直接跳转 (全平台通用)</option>
+              <option value="2">2. 仅限微信内访问 (微信扫码专用)</option>
+              <option value="3">3. 仅限 iOS 设备访问</option>
+              <option value="4">4. 仅限 Android 设备访问</option>
+              <option value="5">5. 仅限手机浏览器访问 (微信内弹右上角引导)</option>
+              <option value="6">6. 按设备分流跳转 (安卓/苹果不同链接)</option>
+            </select>
+          </div>
+
+          <div id="deviceSplitFields" style="display: none; background: #f8fafc; padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-bottom: 16px;">
+            <div class="form-group">
+              <label class="form-label">Android 设备目标链接</label>
+              <input type="url" id="dwzFormAndroid" class="form-input" placeholder="https://...">
+            </div>
+            <div class="form-group">
+              <label class="form-label">iOS 设备目标链接</label>
+              <input type="url" id="dwzFormIos" class="form-input" placeholder="https://...">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label">Windows / 电脑目标链接</label>
+              <input type="url" id="dwzFormWindows" class="form-input" placeholder="https://...">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('dwzModal')">取消</button>
+          <button type="submit" class="btn btn-primary">保存短网址</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Create/Edit Group Live Code -->
+  <div class="modal-backdrop" id="qunModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="qunModalTitle">新建群活码</h3>
+        <button class="modal-close" onclick="closeModal('qunModal')">&times;</button>
+      </div>
+      <form id="qunForm" onsubmit="handleQunSubmit(event)">
+        <div class="modal-body">
+          <input type="hidden" id="qunFormId">
+
+          <div class="form-group">
+            <label class="form-label">群活码标题</label>
+            <input type="text" id="qunFormTitle" class="form-input" placeholder="例如：VIP 核心客户交流群" required>
+          </div>
+
+          <div class="form-group" style="display: flex; gap: 24px;">
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer;">
+              <input type="checkbox" id="qunFormQc" checked>
+              <span>开启7天去重 (老用户固定展示首个入群码)</span>
+            </label>
+          </div>
+
+          <div class="form-group" style="display: flex; gap: 24px;">
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer;">
+              <input type="checkbox" id="qunFormSafety" checked>
+              <span>展示微信官方安全认证绿标</span>
+            </label>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">进群说明 / 公告备注</label>
+            <textarea id="qunFormBeizhu" class="form-textarea" rows="3" placeholder="例如：进群后请遵守群规，禁止广告，加群主微信领取福利。"></textarea>
+          </div>
+
+          <div style="background: #f8fafc; padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-top: 16px;">
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 10px;">
+              <input type="checkbox" id="qunFormKfStatus">
+              <span>启用群满客服二维码兜底</span>
+            </label>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label">客服二维码图片地址</label>
+              <input type="text" id="qunFormKfQrcode" class="form-input" placeholder="可在素材库上传后粘贴 /api/blob/... 链接">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('qunModal')">取消</button>
+          <button type="submit" class="btn btn-primary">保存群活码</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Manage Subcodes (zima) -->
+  <div class="modal-backdrop" id="zimaModal">
+    <div class="modal-card modal-card-large">
+      <div class="modal-header">
+        <h3 id="zimaModalTitle">子码管理</h3>
+        <button class="modal-close" onclick="closeModal('zimaModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="zimaListContainer">
+          <!-- Populated by JS -->
+        </div>
+
+        <!-- Add New Subcode Form -->
+        <div style="margin-top: 24px; padding-top: 20px; border-top: 1px dashed var(--border-color);">
+          <h4 style="font-size: 15px; font-weight: 700; margin-bottom: 14px;">+ 上传添加新微信群二维码 (直接存入 EdgeOne Blob)</h4>
+          <form id="addZimaForm" onsubmit="handleAddZima(event)">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 14px;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label">选择微信群二维码图片</label>
+                <input type="file" id="zimaFileInput" class="form-input" accept="image/*" required>
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label">扫码阈值人数 (达到后自动切下一码)</label>
+                <input type="number" id="zimaFormMax" class="form-input" value="200" min="1" max="500">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">群主微信号 (可选，二维码失效备用)</label>
+              <input type="text" id="zimaFormLeader" class="form-input" placeholder="例如：sansure2016">
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%;">确认上传并加入轮换</button>
+          </form>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('zimaModal')">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: QR Code Preview -->
+  <div class="modal-backdrop" id="qrModal">
+    <div class="modal-card" style="max-width: 380px; text-align: center;">
+      <div class="modal-header">
+        <h3 id="qrModalTitle">二维码预览</h3>
+        <button class="modal-close" onclick="closeModal('qrModal')">&times;</button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; align-items: center;">
+        <div id="qrModalCanvas" style="margin: 16px auto; padding: 12px; background: #fff; border-radius: 12px; border: 1px solid #e2e8f0;"></div>
+        <div id="qrModalLinkText" style="font-size: 12px; color: var(--text-muted); word-break: break-all; margin-top: 8px;"></div>
+      </div>
+      <div class="modal-footer" style="justify-content: center;">
+        <button type="button" class="btn btn-primary" onclick="copyText(document.getElementById('qrModalLinkText').textContent)">复制链接</button>
+        <button type="button" class="btn btn-secondary" onclick="closeModal('qrModal')">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Mobile Simulator -->
+  <div class="modal-backdrop" id="phoneSimulatorModal">
+    <div class="modal-card" style="max-width: 380px; background: transparent; box-shadow: none; border: none;">
+      <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
+        <button class="btn btn-secondary btn-sm" style="background: rgba(255,255,255,0.8);" onclick="closeModal('phoneSimulatorModal')">✕ 关闭模拟器</button>
+      </div>
+      <div class="phone-simulator-container">
+        <div class="iphone-frame">
+          <div class="iphone-notch"></div>
+          <iframe id="phoneSimulatorFrame" class="iphone-screen"></iframe>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+{
+  "name": "dwz-qun-edgeone",
+  "version": "1.0.0",
+  "description": "Short URL (短网址) and Group Live QR Code (群活码) service built for Tencent Cloud EdgeOne Pages with KV and Blob storage.",
+  "type": "module",
+  "scripts": {
+    "test": "node test/test-storage.js"
+  },
+  "keywords": [
+    "edgeone",
+    "edge-functions",
+    "short-url",
+    "dwz",
+    "qun-huoma",
+    "pages-blob",
+    "pages-kv"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@edgeone/pages-blob": "^0.0.16"
+  }
+}
