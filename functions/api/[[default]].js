@@ -177,8 +177,9 @@ export default async function onRequest(context) {
 
   if (path === "/logout" && method === "POST") {
     const session = await verifySession(request, kv);
-    if (session && session.token) {
-      await kv.delete(`session_${session.token}`);
+    if (session) {
+      if (session.token) await kv.delete(`session_${session.token}`);
+      if (session.username) await kv.delete(`user_session_token_${session.username}`);
     }
     const headers = {
       "Content-Type": "application/json; charset=utf-8",

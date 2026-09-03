@@ -48,22 +48,33 @@ export async function authenticate(kv, username, password) {
 }
 
 /**
- * Generate a new session token
+ * Generate a new session token and clean up old sessions
  */
 export async function createSession(kv, username) {
+  // Clean up previous session of the same user to avoid accumulating keys in KV
+  try {
+    const prevToken = await kv.get(`user_session_token_${username}`);
+    if (prevToken) {
+      await kv.delete(`session_${prevToken}`);
+    }
+  } catch (e) {}
+
   const token =
     typeof crypto.randomUUID === "function"
       ? crypto.randomUUID().replace(/-/g, "")
       : Math.random().toString(36).substring(2) + Date.now().toString(36);
 
+  const ttlSeconds = 7 * 24 * 3600; // 7 days in seconds
   const sessionData = {
     username,
     token,
     createdAt: Date.now(),
-    expiresAt: Date.now() + 7 * 24 * 3600 * 1000, // 7 days
+    expiresAt: Date.now() + ttlSeconds * 1000,
   };
 
-  await kv.putJSON(`session_${token}`, sessionData);
+  // EdgeOne KV native TTL automatically purges expired records
+  await kv.putJSON(`session_${token}`, sessionData, { expirationTtl: ttlSeconds });
+  await kv.put(`user_session_token_${username}`, token, { expirationTtl: ttlSeconds });
   return token;
 }
 

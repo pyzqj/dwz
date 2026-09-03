@@ -728,23 +728,86 @@ function removeNewSubcode(index) {
 }
 
 async function handleBatchAddGroupImages(e) {
-  const files = e.target.files;
+  const files = e.target ? e.target.files : e;
   if (!files || files.length === 0) return;
 
-  showToast(`正在自动上传 ${files.length} 张群二维码至云存储...`, "info");
-  for (let i = 0; i < files.length; i++) {
-    const url = await uploadFileToBlob(files[i]);
-    if (url) {
-      STATE.newQunSubcodes.push({
-        qrcode: url,
-        max_num: 200,
-        leader: "",
+  const total = files.length;
+  const progressBox = document.getElementById("qunModalUploadProgress");
+  const progressTitle = document.getElementById("qunModalProgressTitle");
+  const progressPercent = document.getElementById("qunModalProgressPercent");
+  const progressBar = document.getElementById("qunModalProgressBar");
+
+  if (progressBox) progressBox.style.display = "block";
+
+  let successCount = 0;
+  for (let i = 0; i < total; i++) {
+    const file = files[i];
+    if (progressTitle) progressTitle.textContent = `正在上传第 ${i + 1}/${total} 张群二维码 (${(file.size / 1024).toFixed(1)} KB)...`;
+
+    try {
+      const url = await uploadFileToBlobWithProgress(file, (pct) => {
+        const overall = Math.round(((i + pct / 100) / total) * 100);
+        if (progressPercent) progressPercent.textContent = `${overall}%`;
+        if (progressBar) progressBar.style.width = `${overall}%`;
       });
+
+      if (url) {
+        STATE.newQunSubcodes.push({
+          qrcode: url,
+          max_num: 200,
+          leader: "",
+        });
+        successCount++;
+        renderNewQunSubcodeList();
+      }
+    } catch (err) {
+      showToast(`图片 ${file.name} 上传失败: ${err.message}`, "error");
     }
   }
-  e.target.value = "";
+
+  if (progressTitle) progressTitle.textContent = `🎉 上传完成！成功加入 ${successCount} 张群二维码`;
+  if (progressPercent) progressPercent.textContent = "100%";
+  if (progressBar) progressBar.style.width = "100%";
+
+  if (e.target && e.target.value) e.target.value = "";
   renderNewQunSubcodeList();
-  showToast(`已成功添加 ${files.length} 个群二维码！`);
+
+  setTimeout(() => {
+    if (progressBox) progressBox.style.display = "none";
+  }, 1000);
+}
+
+async function handleKfUpload(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+
+  const progressBox = document.getElementById("qunKfUploadProgress");
+  const progressTitle = document.getElementById("qunKfProgressTitle");
+  const progressPercent = document.getElementById("qunKfProgressPercent");
+  const progressBar = document.getElementById("qunKfProgressBar");
+
+  if (progressBox) progressBox.style.display = "block";
+  if (progressTitle) progressTitle.textContent = `正在上传客服二维码 (${(file.size / 1024).toFixed(1)} KB)...`;
+
+  try {
+    const url = await uploadFileToBlobWithProgress(file, (pct) => {
+      if (progressPercent) progressPercent.textContent = `${pct}%`;
+      if (progressBar) progressBar.style.width = `${pct}%`;
+    });
+
+    if (url) {
+      document.getElementById("qunFormKfQrcode").value = url;
+      if (progressTitle) progressTitle.textContent = "✅ 客服二维码上传成功！";
+      showToast("客服二维码已上传并填入");
+    }
+  } catch (err) {
+    showToast(`上传客服二维码失败: ${err.message}`, "error");
+  } finally {
+    e.target.value = "";
+    setTimeout(() => {
+      if (progressBox) progressBox.style.display = "none";
+    }, 1000);
+  }
 }
 
 async function handleQunSubmit(e) {
@@ -923,29 +986,56 @@ async function handleAddZimaInDrawer(e) {
   const fileInput = document.getElementById("drawerZimaFileInput");
   const max_num = document.getElementById("drawerZimaMaxNum").value || 200;
   const leader = document.getElementById("drawerZimaLeader").value.trim();
+  const submitBtn = document.getElementById("zimaDrawerSubmitBtn");
 
   if (!fileInput.files || fileInput.files.length === 0) {
     showToast("请先选择群二维码图片文件", "error");
     return;
   }
 
-  showToast("正在上传群二维码至云存储...", "info");
-  const qrcodeUrl = await uploadFileToBlob(fileInput.files[0]);
-  if (!qrcodeUrl) return;
+  const file = fileInput.files[0];
+  const progressBox = document.getElementById("zimaDrawerUploadProgress");
+  const progressTitle = document.getElementById("zimaDrawerProgressTitle");
+  const progressPercent = document.getElementById("zimaDrawerProgressPercent");
+  const progressBar = document.getElementById("zimaDrawerProgressBar");
 
-  const res = await apiRequest("/api/qun/zima/add", "POST", {
-    qun_id,
-    qrcode: qrcodeUrl,
-    max_num,
-    leader,
-  });
+  if (progressBox) progressBox.style.display = "block";
+  if (progressTitle) progressTitle.textContent = `正在上传 (${(file.size / 1024).toFixed(1)} KB)...`;
+  if (submitBtn) submitBtn.disabled = true;
 
-  if (res && res.code === 200) {
-    showToast("群子码添加成功");
-    fileInput.value = "";
-    document.getElementById("drawerZimaLeader").value = "";
-    openZimaDrawer(qun_id);
-    loadQunList();
+  try {
+    const qrcodeUrl = await uploadFileToBlobWithProgress(file, (pct) => {
+      if (progressPercent) progressPercent.textContent = `${pct}%`;
+      if (progressBar) progressBar.style.width = `${pct}%`;
+    });
+
+    if (!qrcodeUrl) return;
+
+    if (progressTitle) progressTitle.textContent = "正在写入轮换池...";
+    const res = await apiRequest("/api/qun/zima/add", "POST", {
+      qun_id,
+      qrcode: qrcodeUrl,
+      max_num,
+      leader,
+    });
+
+    if (res && res.code === 200) {
+      if (progressTitle) progressTitle.textContent = "✅ 上传并加入轮换池成功！";
+      showToast("群子码添加成功");
+      fileInput.value = "";
+      document.getElementById("drawerZimaLeader").value = "";
+      setTimeout(() => {
+        if (progressBox) progressBox.style.display = "none";
+        openZimaDrawer(qun_id);
+        loadQunList();
+      }, 600);
+    } else {
+      showToast(res?.msg || "添加失败", "error");
+    }
+  } catch (err) {
+    showToast(`上传失败: ${err.message}`, "error");
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
   }
 }
 
@@ -1292,6 +1382,49 @@ function openPhoneSimulator(targetUrl) {
 }
 
 // -------------------------------------------------------------
+// Mobile Table Horizontal Scroll Helpers
+// -------------------------------------------------------------
+function scrollTableTo(containerId, direction) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const targetX = direction === "right" ? el.scrollWidth : 0;
+  el.scrollTo({ left: targetX, behavior: "smooth" });
+}
+
+function initTableScrollDrag() {
+  document.querySelectorAll(".table-responsive").forEach((container) => {
+    let isDown = false;
+    let startX = 0;
+    let scrollLeft = 0;
+
+    container.addEventListener("mousedown", (e) => {
+      isDown = true;
+      container.style.cursor = "grabbing";
+      startX = e.pageX - container.offsetLeft;
+      scrollLeft = container.scrollLeft;
+    });
+
+    container.addEventListener("mouseleave", () => {
+      isDown = false;
+      container.style.cursor = "default";
+    });
+
+    container.addEventListener("mouseup", () => {
+      isDown = false;
+      container.style.cursor = "default";
+    });
+
+    container.addEventListener("mousemove", (e) => {
+      if (!isDown) return;
+      e.preventDefault();
+      const x = e.pageX - container.offsetLeft;
+      const walk = (x - startX) * 1.5;
+      container.scrollLeft = scrollLeft - walk;
+    });
+  });
+}
+
+// -------------------------------------------------------------
 // System Settings (Public Generation Switch)
 // -------------------------------------------------------------
 async function loadSystemSettings() {
@@ -1319,4 +1452,5 @@ async function togglePublicDwzSetting(checked) {
 window.addEventListener("DOMContentLoaded", () => {
   checkAuth();
   initBlobDropzone();
+  initTableScrollDrag();
 });

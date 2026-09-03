@@ -34,6 +34,13 @@
         </div>
         <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; margin-top: 10px; font-size: 15px;">立即登录控制台</button>
       </form>
+
+      <div style="margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--border-color); text-align: center;">
+        <a href="/" style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-muted); text-decoration: none; transition: color 0.2s;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          <span>返回系统首页</span>
+        </a>
+      </div>
     </div>
   </div>
 
@@ -215,8 +222,14 @@
           </div>
 
           <div class="card-table">
-            <div class="table-scroll-hint">👈 左右滑动查看完整操作按钮与详情 👉</div>
-            <div class="table-responsive">
+            <div class="table-scroll-hint">
+              <span>👈 左右滑动查看完整操作按钮 👉</span>
+              <div style="display: inline-flex; gap: 6px; margin-left: 8px;">
+                <button type="button" class="btn btn-primary btn-sm" style="padding: 2px 8px; font-size: 11px;" onclick="scrollTableTo('dwzTableResponsive', 'right')">滑到操作区 ➡️</button>
+                <button type="button" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 11px;" onclick="scrollTableTo('dwzTableResponsive', 'left')">⬅️ 最左</button>
+              </div>
+            </div>
+            <div class="table-responsive" id="dwzTableResponsive">
               <table>
                 <thead>
                   <tr>
@@ -247,8 +260,14 @@
           </div>
 
           <div class="card-table">
-            <div class="table-scroll-hint">👈 左右滑动查看完整操作按钮与详情 👉</div>
-            <div class="table-responsive">
+            <div class="table-scroll-hint">
+              <span>👈 左右滑动查看完整操作按钮 👉</span>
+              <div style="display: inline-flex; gap: 6px; margin-left: 8px;">
+                <button type="button" class="btn btn-primary btn-sm" style="padding: 2px 8px; font-size: 11px;" onclick="scrollTableTo('qunTableResponsive', 'right')">滑到操作区 ➡️</button>
+                <button type="button" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 11px;" onclick="scrollTableTo('qunTableResponsive', 'left')">⬅️ 最左</button>
+              </div>
+            </div>
+            <div class="table-responsive" id="qunTableResponsive">
               <table>
                 <thead>
                   <tr>
@@ -540,6 +559,17 @@
               </label>
             </div>
 
+            <!-- Real Progress Bar for Batch Subcodes Upload -->
+            <div class="upload-progress-container" id="qunModalUploadProgress" style="margin-bottom: 14px;">
+              <div class="upload-progress-header">
+                <span id="qunModalProgressTitle" style="font-size: 13px;">正在上传群二维码...</span>
+                <span id="qunModalProgressPercent" style="color: var(--primary); font-weight: 700;">0%</span>
+              </div>
+              <div class="upload-progress-track">
+                <div class="upload-progress-fill" id="qunModalProgressBar"></div>
+              </div>
+            </div>
+
             <!-- List of Subcodes -->
             <div id="newQunSubcodesContainer"></div>
           </div>
@@ -566,7 +596,22 @@
                 <span>👤 启用群满个人客服二维码兜底</span>
               </label>
               <div class="form-group" style="margin-bottom: 0;">
-                <input type="text" id="qunFormKfQrcode" class="form-input" placeholder="粘贴客服二维码直链 (可在素材库上传后复制 /api/blob/... 链接)">
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <input type="text" id="qunFormKfQrcode" class="form-input" placeholder="粘贴客服二维码直链或点击右侧上传" style="flex: 1;">
+                  <label class="btn btn-secondary btn-sm" style="cursor: pointer; white-space: nowrap; padding: 10px 14px;">
+                    <span>📷 上传图片</span>
+                    <input type="file" id="qunKfFileInput" accept="image/*" style="display: none;" onchange="handleKfUpload(event)">
+                  </label>
+                </div>
+                <div class="upload-progress-container" id="qunKfUploadProgress" style="margin-top: 8px; margin-bottom: 0;">
+                  <div class="upload-progress-header">
+                    <span id="qunKfProgressTitle" style="font-size: 12px;">正在上传客服二维码...</span>
+                    <span id="qunKfProgressPercent" style="color: var(--primary); font-weight: 700;">0%</span>
+                  </div>
+                  <div class="upload-progress-track">
+                    <div class="upload-progress-fill" id="qunKfProgressBar"></div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -608,7 +653,19 @@
               <label class="form-label">群主微信号 (可选，二维码失效备用)</label>
               <input type="text" id="drawerZimaLeader" class="form-input" placeholder="例如：wxid_xxx">
             </div>
-            <button type="submit" class="btn btn-primary" style="width: 100%;">确认上传并加入轮换池</button>
+
+            <!-- Upload Progress Bar in Drawer -->
+            <div class="upload-progress-container" id="zimaDrawerUploadProgress" style="margin-bottom: 12px;">
+              <div class="upload-progress-header">
+                <span id="zimaDrawerProgressTitle" style="font-size: 12px;">正在上传二维码图片...</span>
+                <span id="zimaDrawerProgressPercent" style="color: var(--primary); font-weight: 700;">0%</span>
+              </div>
+              <div class="upload-progress-track">
+                <div class="upload-progress-fill" id="zimaDrawerProgressBar"></div>
+              </div>
+            </div>
+
+            <button type="submit" id="zimaDrawerSubmitBtn" class="btn btn-primary" style="width: 100%;">确认上传并加入轮换池</button>
           </form>
         </div>
       </div>

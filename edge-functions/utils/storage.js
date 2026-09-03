@@ -73,18 +73,22 @@ export function getKV(context) {
           return null;
         }
       },
-      async put(key, value) {
+      async put(key, value, options = null) {
         try {
           const str = typeof value === "string" ? value : JSON.stringify(value);
-          await kvCandidate.put(key, str);
+          if (options && typeof options === "object") {
+            await kvCandidate.put(key, str, options);
+          } else {
+            await kvCandidate.put(key, str);
+          }
           return true;
         } catch (err) {
           console.error(`[KV Error] put("${key}"):`, err);
           return false;
         }
       },
-      async putJSON(key, value) {
-        return await this.put(key, JSON.stringify(value));
+      async putJSON(key, value, options = null) {
+        return await this.put(key, JSON.stringify(value), options);
       },
       async delete(key) {
         try {
