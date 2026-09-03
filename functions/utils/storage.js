@@ -5,7 +5,7 @@
  * Blob: https://cloud.tencent.com/document/product/1552/131425
  */
 
-import { getStore } from "@edgeone/pages-blob";
+import { getStore, listStores } from "@edgeone/pages-blob";
 
 // In-memory fallback for local dev / testing before EdgeOne KV binding is configured
 const memoryStore = new Map();
@@ -140,6 +140,7 @@ export function getBlob(storeName = "dwz-blob") {
     const store = getStore(storeName);
     return {
       isMock: false,
+      storeName,
       async set(key, buffer, options = {}) {
         return await store.set(key, buffer, options);
       },
@@ -157,6 +158,7 @@ export function getBlob(storeName = "dwz-blob") {
     // Local dev or credentials not initialized yet
     return {
       isMock: true,
+      storeName,
       async set(key, buffer, options = {}) {
         memoryBlobStore.set(key, { data: buffer, options, time: Date.now() });
         return true;
@@ -181,7 +183,7 @@ export function getBlob(storeName = "dwz-blob") {
         const prefix = options.prefix || "";
         const blobs = [];
         for (const [key, val] of memoryBlobStore.entries()) {
-          if (key.startsWith(prefix)) {
+          if (!prefix || key.startsWith(prefix)) {
             blobs.push({ key, size: val.data?.byteLength || val.data?.length || 0 });
           }
         }
@@ -189,4 +191,98 @@ export function getBlob(storeName = "dwz-blob") {
       },
     };
   }
+}
+
+/**
+ * Retrieve all blobs across known stores without prefix restrictions
+ * This guarantees images uploaded via console or API are all discovered
+ */
+export async function getAllBlobs() {
+  const allBlobs = [];
+  const storesToTry = ["dwz-blob", "default"];
+
+  try {
+    const storeRes = await listStores();
+    if (storeRes && Array.isArray(storeRes.stores)) {
+      for (const s of storeRes.stores) {
+        const name = typeof s === "string" ? s : s.name;
+        if (name && !storesToTry.includes(name)) {
+          storesToTry.push(name);
+        }
+      }
+    }
+  } catch (e) {
+    // ignore listStores errors in restricted environments
+  }
+
+  const seenKeys = new Set();
+  for (const storeName of storesToTry) {
+    try {
+      const blobStore = getBlob(storeName);
+      const res = await blobStore.list();
+      if (res && Array.isArray(res.blobs)) {
+        for (const b of res.blobs) {
+          if (!seenKeys.has(b.key)) {
+            seenKeys.add(b.key);
+            allBlobs.push({
+              key: b.key,
+              storeName,
+              size: b.size || 0,
+              etag: b.etag || "",
+            });
+          }
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  // Also include in-memory mock items if any
+  for (const [key, val] of memoryBlobStore.entries()) {
+    if (!seenKeys.has(key)) {
+      seenKeys.add(key);
+      allBlobs.push({
+        key,
+        storeName: "memory",
+        size: val.data?.byteLength || val.data?.length || 0,
+        etag: "mock",
+      });
+    }
+  }
+
+  return allBlobs;
+}
+
+/**
+ * Retrieve blob file data trying all stores
+ */
+export async function getBlobData(key) {
+  const storesToTry = ["dwz-blob", "default"];
+  try {
+    const storeRes = await listStores();
+    if (storeRes && Array.isArray(storeRes.stores)) {
+      for (const s of storeRes.stores) {
+        const name = typeof s === "string" ? s : s.name;
+        if (name && !storesToTry.includes(name)) {
+          storesToTry.push(name);
+        }
+      }
+    }
+  } catch (e) {}
+
+  for (const storeName of storesToTry) {
+    try {
+      const store = getBlob(storeName);
+      const data = await store.get(key, { type: "arrayBuffer" });
+      if (data) return data;
+    } catch (e) {}
+  }
+
+  // Check mock store
+  if (memoryBlobStore.has(key)) {
+    return memoryBlobStore.get(key).data;
+  }
+
+  return null;
 }

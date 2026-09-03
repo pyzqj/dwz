@@ -1,16 +1,18 @@
 /**
- * EdgeOne Short URL & Group Live Code Console SPA Application Logic
+ * EdgeLink (极连) Console SPA Frontend Application
+ * Fully responsive, modern, cloud-native
  */
 
 const STATE = {
   activeTab: "overview",
   isLoggedIn: false,
   username: "admin",
-  stats: {},
+  apiKey: "",
   dwzList: [],
   qunList: [],
   blobList: [],
   currentQunId: null,
+  newQunSubcodes: [], // Temp subcodes during creation
 };
 
 // Toast Notifications
@@ -29,7 +31,22 @@ function showToast(message, type = "success") {
   }, 3500);
 }
 
-// Extract any EdgeOne preview parameters (eo_token, eo_time) to forward with API calls
+// Mobile Menu Navigation Toggle
+function toggleMobileMenu() {
+  const sidebar = document.querySelector(".sidebar");
+  const overlay = document.getElementById("sidebarOverlay");
+  const isOpen = sidebar.classList.toggle("open");
+  if (overlay) overlay.classList.toggle("show", isOpen);
+}
+
+function closeMobileMenu() {
+  const sidebar = document.querySelector(".sidebar");
+  const overlay = document.getElementById("sidebarOverlay");
+  if (sidebar) sidebar.classList.remove("open");
+  if (overlay) overlay.classList.remove("show");
+}
+
+// Forward any EdgeOne preview parameters (eo_token, eo_time)
 function getPreviewQueryParams() {
   const currentParams = new URLSearchParams(window.location.search);
   const forwardParams = new URLSearchParams();
@@ -41,7 +58,7 @@ function getPreviewQueryParams() {
   return forwardParams.toString();
 }
 
-// API Helper
+// Unified API Helper
 async function apiRequest(endpoint, method = "GET", body = null) {
   const previewQuery = getPreviewQueryParams();
   let fullUrl = endpoint;
@@ -73,8 +90,8 @@ async function apiRequest(endpoint, method = "GET", body = null) {
 
     // Detect if EdgeOne preview gateway blocked the request
     const eoMsg = res.headers.get("X-EOP-MSG") || "";
-    if (eoMsg.includes("eo_time") || eoMsg.includes("token") || res.status === 401 && eoMsg) {
-      showToast("EdgeOne 预览保护生效中，请从控制台点击【预览】打开带签名链接，或在 EdgeOne 项目设置中关闭【预览保护】", "error");
+    if (eoMsg.includes("eo_time") || eoMsg.includes("token") || (res.status === 401 && eoMsg)) {
+      showToast("EdgeOne 预览保护生效中，请使用自定义域名 https://d.pyz.me 访问，或在项目设置中关闭预览保护", "error");
       return null;
     }
 
@@ -87,7 +104,7 @@ async function apiRequest(endpoint, method = "GET", body = null) {
     const contentType = res.headers.get("content-type") || "";
     if (!contentType.includes("application/json")) {
       const text = await res.text();
-      console.warn("Non-JSON response from API:", text.substring(0, 200));
+      console.warn("Non-JSON API response:", text.substring(0, 200));
       return null;
     }
 
@@ -101,6 +118,7 @@ async function apiRequest(endpoint, method = "GET", body = null) {
 
 // Tab Switching
 function switchTab(tabId) {
+  closeMobileMenu();
   STATE.activeTab = tabId;
   document.querySelectorAll(".nav-item").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.tab === tabId);
@@ -113,7 +131,8 @@ function switchTab(tabId) {
     overview: "概览面板",
     dwz: "短网址管理",
     qun: "群活码管理",
-    blob: "EdgeOne Blob 素材库",
+    blob: "Blob 素材库",
+    api: "开放 API 文档",
     settings: "系统设置",
   };
   document.getElementById("currentPageTitle").textContent = titleMap[tabId] || "控制台";
@@ -122,13 +141,14 @@ function switchTab(tabId) {
   if (tabId === "dwz") loadDwzList();
   if (tabId === "qun") loadQunList();
   if (tabId === "blob") loadBlobList();
+  if (tabId === "api") loadApiDocs();
 }
 
 // Copy to Clipboard
 function copyText(text) {
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(text).then(() => {
-      showToast("链接已复制到剪贴板！");
+      showToast("已成功复制到剪贴板！");
     });
   } else {
     const input = document.createElement("input");
@@ -137,7 +157,7 @@ function copyText(text) {
     input.select();
     document.execCommand("copy");
     input.remove();
-    showToast("链接已复制到剪贴板！");
+    showToast("已成功复制到剪贴板！");
   }
 }
 
@@ -145,12 +165,6 @@ function copyText(text) {
 // Auth Logic
 // -------------------------------------------------------------
 async function checkAuth() {
-  // Check if preview domain without eo_time
-  if (window.location.hostname.endsWith(".edgeone.dev") && !window.location.search.includes("eo_time")) {
-    const banner = document.getElementById("previewWarningBanner");
-    if (banner) banner.style.display = "block";
-  }
-
   const res = await apiRequest("/api/auth/check");
   if (res && res.data && res.data.loggedIn) {
     STATE.isLoggedIn = true;
@@ -170,7 +184,7 @@ async function handleLogin(e) {
   const password = document.getElementById("loginPassword").value.trim();
 
   if (!username || !password) {
-    showToast("请输入账号和密码", "error");
+    showToast("请输入管理员账号和密码", "error");
     return;
   }
 
@@ -198,7 +212,7 @@ async function handleLogout() {
 }
 
 // -------------------------------------------------------------
-// Overview / Stats
+// Overview Statistics
 // -------------------------------------------------------------
 async function loadOverview() {
   const res = await apiRequest("/api/stats");
@@ -213,17 +227,15 @@ async function loadOverview() {
 
     const runtimeBadge = document.getElementById("runtimeStatusBadge");
     if (d.isMock) {
-      runtimeBadge.textContent = "🟡 本地开发模式 (Mock 缓存)";
-      runtimeBadge.className = "badge badge-warning";
+      runtimeBadge.textContent = "🟡 本地开发模式 (Mock 存储)";
     } else {
-      runtimeBadge.textContent = "🟢 腾讯云 EdgeOne 边缘生产就绪";
-      runtimeBadge.className = "badge badge-success";
+      runtimeBadge.textContent = "🟢 EdgeOne 边缘在线";
     }
   }
 }
 
 // -------------------------------------------------------------
-// ⚡ 1-Step Quick Short URL Generator (一键粘贴即生成)
+// ⚡ 1-Step Quick Short URL Generator (粘贴长链一秒出短链)
 // -------------------------------------------------------------
 async function handleQuickGenerate(e, inputId = "quickUrlInput") {
   if (e) e.preventDefault();
@@ -249,7 +261,7 @@ async function handleQuickGenerate(e, inputId = "quickUrlInput") {
     // Pop up instant result modal with QR code
     showGeneratedResultModal(res.data, shortUrl);
 
-    // Refresh lists
+    // Refresh active list
     if (STATE.activeTab === "dwz") loadDwzList();
     if (STATE.activeTab === "overview") loadOverview();
   } else {
@@ -279,7 +291,7 @@ function showGeneratedResultModal(item, shortUrl) {
 }
 
 // -------------------------------------------------------------
-// 短网址 (dwz)
+// 短网址 (dwz) Management
 // -------------------------------------------------------------
 const DWZ_TYPE_MAP = {
   1: { text: "通用跳转", class: "badge-primary" },
@@ -303,7 +315,7 @@ function renderDwzTable(list) {
   tbody.innerHTML = "";
 
   if (!list || list.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="empty-icon">🔗</div><p>暂无短网址，请在上方粘贴长链接一键生成</p></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="empty-icon">🔗</div><p>暂无短网址，直接在上方输入框粘贴长链接即可生成</p></td></tr>`;
     return;
   }
 
@@ -311,42 +323,42 @@ function renderDwzTable(list) {
 
   list.forEach((item) => {
     const fullShortUrl = `${origin}/s/${item.key}`;
-    const typeInfo = DWZ_TYPE_MAP[item.type] || { text: "未知类型", class: "badge-secondary" };
+    const typeInfo = DWZ_TYPE_MAP[item.type] || { text: "通用跳转", class: "badge-primary" };
 
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>
+      <td style="min-width: 170px;">
         <strong>${item.title || "短网址"}</strong>
-        <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">${item.created_at || ""}</div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">${item.created_at || ""}</div>
       </td>
-      <td>
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <code style="background: #f1f5f9; padding: 4px 8px; border-radius: 6px; font-weight: 600;">${item.key}</code>
+      <td style="min-width: 160px;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <code style="background: #f1f5f9; padding: 4px 7px; border-radius: 6px; font-weight: 700; font-size: 13px;">${item.key}</code>
           <button class="btn btn-secondary btn-sm" onclick="copyText('${fullShortUrl}')" title="复制短链接">📋 复制</button>
         </div>
       </td>
-      <td>
-        <div style="max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-          <a href="${item.url}" target="_blank" style="color: var(--primary); text-decoration: none;">${item.url}</a>
+      <td style="max-width: 260px;">
+        <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+          <a href="${item.url}" target="_blank" style="color: var(--primary); text-decoration: none;" title="${item.url}">${item.url}</a>
         </div>
       </td>
-      <td><span class="badge ${typeInfo.class}">${typeInfo.text}</span></td>
-      <td>
+      <td style="min-width: 110px;"><span class="badge ${typeInfo.class}">${typeInfo.text}</span></td>
+      <td style="min-width: 100px;">
         <div><strong>${item.pv || 0}</strong> <small style="color: var(--text-muted);">次</small></div>
         <div style="font-size: 11px; color: var(--text-light);">今日: ${item.today_pv_count || 0}</div>
       </td>
-      <td>
+      <td style="min-width: 70px;">
         <label class="switch">
           <input type="checkbox" ${item.status === 1 ? "checked" : ""} onchange="toggleDwzStatus('${item.key}')">
           <span class="slider"></span>
         </label>
       </td>
-      <td>
-        <div style="display: flex; gap: 6px;">
-          <button class="btn btn-secondary btn-sm" onclick="showQrModal('${fullShortUrl}', '${item.title}')">📱 码</button>
-          <button class="btn btn-secondary btn-sm" onclick="openEditDwzModal('${item.key}')">✏️</button>
+      <td style="min-width: 180px; white-space: nowrap;">
+        <div style="display: flex; gap: 5px;">
+          <button class="btn btn-secondary btn-sm" onclick="showQrModal('${fullShortUrl}', '${item.title}')" title="查看二维码">📱 码</button>
+          <button class="btn btn-secondary btn-sm" onclick="openEditDwzModal('${item.key}')" title="编辑短网址">✏️</button>
           <button class="btn btn-secondary btn-sm" onclick="resetDwzPv('${item.key}')" title="清零访问量">🔄</button>
-          <button class="btn btn-danger btn-sm" onclick="deleteDwz('${item.key}')" title="删除">🗑️</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteDwz('${item.key}')" title="删除短网址">🗑️</button>
         </div>
       </td>
     `;
@@ -391,7 +403,7 @@ function openEditDwzModal(key) {
   document.getElementById("dwzModalTitle").textContent = "编辑短网址";
   document.getElementById("dwzFormKey").value = item.key;
   document.getElementById("dwzFormKeyInput").value = item.key;
-  document.getElementById("dwzFormKeyInput").disabled = true; // Key cannot be edited
+  document.getElementById("dwzFormKeyInput").disabled = true;
   document.getElementById("dwzFormTitle").value = item.title || "";
   document.getElementById("dwzFormUrl").value = item.url || "";
   document.getElementById("dwzFormType").value = String(item.type || 1);
@@ -425,7 +437,6 @@ async function handleDwzSubmit(e) {
   }
 
   if (editingKey) {
-    // Update
     const res = await apiRequest("/api/dwz/update", "POST", {
       key: editingKey,
       title,
@@ -436,14 +447,13 @@ async function handleDwzSubmit(e) {
       windows_url,
     });
     if (res && res.code === 200) {
-      showToast("修改成功");
+      showToast("修改短网址成功");
       closeModal("dwzModal");
       loadDwzList();
     } else {
       showToast(res?.msg || "修改失败", "error");
     }
   } else {
-    // Create
     const res = await apiRequest("/api/dwz/create", "POST", {
       key: keyInput,
       title,
@@ -454,7 +464,7 @@ async function handleDwzSubmit(e) {
       windows_url,
     });
     if (res && res.code === 200) {
-      showToast("创建成功");
+      showToast("创建短网址成功");
       closeModal("dwzModal");
       loadDwzList();
     } else {
@@ -490,7 +500,7 @@ async function deleteDwz(key) {
 }
 
 // -------------------------------------------------------------
-// 群活码 (qun)
+// 👥 群活码 (qun) Completely Rewritten Architecture
 // -------------------------------------------------------------
 async function loadQunList() {
   const res = await apiRequest("/api/qun/list");
@@ -505,7 +515,7 @@ function renderQunTable(list) {
   tbody.innerHTML = "";
 
   if (!list || list.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="empty-icon">👥</div><p>暂无群活码，点击右上角新建</p></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="empty-state"><div class="empty-icon">👥</div><p>暂无群活码，点击右上角【+ 新建群活码】一步完成配置</p></td></tr>`;
     return;
   }
 
@@ -513,40 +523,59 @@ function renderQunTable(list) {
 
   list.forEach((item) => {
     const fullQunUrl = `${origin}/qun/${item.id}`;
-    const tr = document.createElement("tr");
+    const zimaCount = item.total_zima || 0;
+    const activeCount = item.active_zima_count || 0;
+    const currentNum = item.current_zima_num || 0;
 
+    let subcodeStatusHtml = "";
+    if (zimaCount === 0) {
+      subcodeStatusHtml = `<span class="badge badge-danger">未上传群二维码</span>`;
+    } else if (currentNum > 0) {
+      subcodeStatusHtml = `
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span class="badge badge-success">第 ${currentNum}/${zimaCount} 群进客中</span>
+        </div>
+      `;
+    } else {
+      subcodeStatusHtml = `<span class="badge badge-warning">所有群码已满员</span>`;
+    }
+
+    const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>
+      <td style="min-width: 170px;">
         <strong>${item.title || "微信群活码"}</strong>
-        <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">${item.created_at || ""}</div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">ID: ${item.id} &bull; ${item.created_at || ""}</div>
       </td>
-      <td>
-        <button class="btn btn-primary btn-sm" onclick="openZimaModal('${item.id}')">
-          📋 子码管理 (${item.total_zima || 0})
+      <td style="min-width: 170px;">
+        <div style="margin-bottom: 5px;">${subcodeStatusHtml}</div>
+        <button class="btn btn-secondary btn-sm" onclick="openZimaDrawer('${item.id}')" style="font-size: 11px; padding: 3px 8px;">
+          ⚙️ 管理 ${zimaCount} 个子码 & 进群阈值
         </button>
       </td>
-      <td>
-        ${item.safety === 1 ? '<span class="badge badge-success" title="显示微信官方安全绿标认证">🛡️ 绿标</span>' : '<span class="badge badge-secondary">无安全标</span>'}
-        ${item.qc === 1 ? '<span class="badge badge-primary" title="7天去重Cookie生效">🔄 7天去重</span>' : '<span class="badge badge-secondary">每次轮换</span>'}
+      <td style="min-width: 130px;">
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          ${item.safety === 1 ? '<span class="badge badge-success" style="font-size: 11px;">🛡️ 微信安全绿标</span>' : '<span class="badge badge-secondary" style="font-size: 11px;">常规模式</span>'}
+          ${item.qc === 1 ? '<span class="badge badge-primary" style="font-size: 11px;">🔄 7天去重防重复</span>' : '<span class="badge badge-secondary" style="font-size: 11px;">无去重</span>'}
+          ${item.kf_status === 1 ? '<span class="badge badge-warning" style="font-size: 11px;">👤 群满客服兜底</span>' : ''}
+        </div>
       </td>
-      <td>
+      <td style="min-width: 100px;">
         <div><strong>${item.pv || 0}</strong> <small style="color: var(--text-muted);">次</small></div>
         <div style="font-size: 11px; color: var(--text-light);">今日: ${item.today_pv_count || 0}</div>
       </td>
-      <td>
+      <td style="min-width: 70px;">
         <label class="switch">
           <input type="checkbox" ${item.status === 1 ? "checked" : ""} onchange="toggleQunStatus('${item.id}')">
           <span class="slider"></span>
         </label>
       </td>
-      <td>
-        <div style="display: flex; gap: 6px;">
-          <button class="btn btn-secondary btn-sm" onclick="copyText('${fullQunUrl}')" title="复制活码链接">🔗 链接</button>
+      <td style="min-width: 220px; white-space: nowrap;">
+        <div style="display: flex; gap: 5px;">
+          <button class="btn btn-primary btn-sm" onclick="copyText('${fullQunUrl}')" title="复制活码永久链接">📋 复制</button>
           <button class="btn btn-secondary btn-sm" onclick="showQrModal('${fullQunUrl}', '${item.title}')" title="查看活码二维码">📱 码</button>
-          <button class="btn btn-secondary btn-sm" onclick="openPhoneSimulator('${fullQunUrl}')" title="真机模拟器实时预览">📱 模拟器</button>
-          <button class="btn btn-secondary btn-sm" onclick="openEditQunModal('${item.id}')">✏️</button>
-          <button class="btn btn-secondary btn-sm" onclick="resetQunPv('${item.id}')" title="清零访问量">🔄</button>
-          <button class="btn btn-danger btn-sm" onclick="deleteQun('${item.id}')" title="删除">🗑️</button>
+          <button class="btn btn-secondary btn-sm" onclick="openPhoneSimulator('${fullQunUrl}')" title="真机模拟器预览真实微信效果">📱 模拟器</button>
+          <button class="btn btn-secondary btn-sm" onclick="openEditQunModal('${item.id}')" title="编辑活码设置">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteQun('${item.id}')" title="删除活码">🗑️</button>
         </div>
       </td>
     `;
@@ -566,31 +595,100 @@ function filterQun() {
   renderQunTable(filtered);
 }
 
+// Open Unified Create Modal
 function openCreateQunModal() {
-  document.getElementById("qunModalTitle").textContent = "新建群活码";
+  STATE.newQunSubcodes = [];
+  document.getElementById("qunModalTitle").textContent = "新建微信群活码 (一站式配置)";
   document.getElementById("qunFormId").value = "";
   document.getElementById("qunFormTitle").value = "";
+  document.getElementById("qunFormBeizhu").value = "";
   document.getElementById("qunFormQc").checked = true;
   document.getElementById("qunFormSafety").checked = true;
   document.getElementById("qunFormKfStatus").checked = false;
   document.getElementById("qunFormKfQrcode").value = "";
-  document.getElementById("qunFormBeizhu").value = "";
+  renderNewQunSubcodeList();
   document.getElementById("qunModal").classList.add("show");
 }
 
-function openEditQunModal(id) {
-  const item = STATE.qunList.find((q) => String(q.id) === String(id));
-  if (!item) return;
+function renderNewQunSubcodeList() {
+  const container = document.getElementById("newQunSubcodesContainer");
+  if (!container) return;
+  container.innerHTML = "";
 
-  document.getElementById("qunModalTitle").textContent = "编辑群活码";
-  document.getElementById("qunFormId").value = item.id;
-  document.getElementById("qunFormTitle").value = item.title || "";
-  document.getElementById("qunFormQc").checked = item.qc === 1;
-  document.getElementById("qunFormSafety").checked = item.safety === 1;
-  document.getElementById("qunFormKfStatus").checked = item.kf_status === 1;
-  document.getElementById("qunFormKfQrcode").value = item.kf_qrcode || "";
-  document.getElementById("qunFormBeizhu").value = item.beizhu || "";
-  document.getElementById("qunModal").classList.add("show");
+  if (STATE.newQunSubcodes.length === 0) {
+    container.innerHTML = `
+      <div style="border: 2px dashed #cbd5e1; padding: 20px; border-radius: 10px; text-align: center; background: #f8fafc; color: #64748b;">
+        <div style="font-size: 28px; margin-bottom: 6px;">📷</div>
+        <div style="font-size: 13px; font-weight: 600;">暂未添加微信群二维码</div>
+        <div style="font-size: 12px; color: #94a3b8; margin-top: 4px;">点击下方按钮可选择图片（支持一次选多张群二维码批量添加）</div>
+      </div>
+    `;
+    return;
+  }
+
+  STATE.newQunSubcodes.forEach((item, index) => {
+    const card = document.createElement("div");
+    card.style.cssText = `
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      margin-bottom: 10px;
+    `;
+    card.innerHTML = `
+      <img src="${item.qrcode}" style="width: 56px; height: 56px; object-fit: contain; border-radius: 6px; border: 1px solid #e2e8f0; background: #f8fafc;">
+      <div style="flex: 1;">
+        <div style="font-size: 13px; font-weight: 700;">第 ${index + 1} 顺位群码</div>
+        <div style="display: flex; gap: 10px; margin-top: 6px; align-items: center;">
+          <label style="font-size: 12px; color: #64748b;">进群阈值人数:</label>
+          <input type="number" value="${item.max_num}" min="1" max="500" style="width: 80px; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px;" onchange="updateNewSubcodeThreshold(${index}, this.value)">
+          <input type="text" value="${item.leader || ''}" placeholder="群主微信号(可选)" style="flex: 1; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px;" onchange="updateNewSubcodeLeader(${index}, this.value)">
+        </div>
+      </div>
+      <button type="button" class="btn btn-danger btn-sm" onclick="removeNewSubcode(${index})">删除</button>
+    `;
+    container.appendChild(card);
+  });
+}
+
+function updateNewSubcodeThreshold(index, val) {
+  if (STATE.newQunSubcodes[index]) {
+    STATE.newQunSubcodes[index].max_num = Number(val) || 200;
+  }
+}
+
+function updateNewSubcodeLeader(index, val) {
+  if (STATE.newQunSubcodes[index]) {
+    STATE.newQunSubcodes[index].leader = val.trim();
+  }
+}
+
+function removeNewSubcode(index) {
+  STATE.newQunSubcodes.splice(index, 1);
+  renderNewQunSubcodeList();
+}
+
+async function handleBatchAddGroupImages(e) {
+  const files = e.target.files;
+  if (!files || files.length === 0) return;
+
+  showToast(`正在自动上传 ${files.length} 张群二维码至 EdgeOne Blob...`, "info");
+  for (let i = 0; i < files.length; i++) {
+    const url = await uploadFileToBlob(files[i]);
+    if (url) {
+      STATE.newQunSubcodes.push({
+        qrcode: url,
+        max_num: 200,
+        leader: "",
+      });
+    }
+  }
+  e.target.value = "";
+  renderNewQunSubcodeList();
+  showToast(`已成功添加 ${files.length} 个群二维码！`);
 }
 
 async function handleQunSubmit(e) {
@@ -609,39 +707,68 @@ async function handleQunSubmit(e) {
   }
 
   if (id) {
+    // Update existing
     const res = await apiRequest("/api/qun/update", "POST", {
       id,
       title,
+      beizhu,
       qc,
       safety,
       kf_status,
       kf_qrcode,
-      beizhu,
     });
     if (res && res.code === 200) {
-      showToast("修改成功");
+      showToast("更新群活码配置成功");
       closeModal("qunModal");
       loadQunList();
     } else {
-      showToast(res?.msg || "修改失败", "error");
+      showToast(res?.msg || "更新失败", "error");
     }
   } else {
+    // Create new with subcodes
+    showToast("正在创建群活码...", "info");
     const res = await apiRequest("/api/qun/create", "POST", {
       title,
+      beizhu,
       qc,
       safety,
       kf_status,
       kf_qrcode,
-      beizhu,
+      zima: STATE.newQunSubcodes,
     });
+
     if (res && res.code === 200) {
-      showToast("创建成功");
+      showToast("🎉 群活码创建成功！");
       closeModal("qunModal");
       loadQunList();
+      // Show QR popup for newly created group code
+      if (res.data && res.data.qunUrl) {
+        showQrModal(res.data.qunUrl, res.data.title);
+      }
     } else {
       showToast(res?.msg || "创建失败", "error");
     }
   }
+}
+
+function openEditQunModal(id) {
+  const item = STATE.qunList.find((q) => String(q.id) === String(id));
+  if (!item) return;
+
+  document.getElementById("qunModalTitle").textContent = "编辑群活码设置";
+  document.getElementById("qunFormId").value = item.id;
+  document.getElementById("qunFormTitle").value = item.title || "";
+  document.getElementById("qunFormQc").checked = item.qc === 1;
+  document.getElementById("qunFormSafety").checked = item.safety === 1;
+  document.getElementById("qunFormKfStatus").checked = item.kf_status === 1;
+  document.getElementById("qunFormKfQrcode").value = item.kf_qrcode || "";
+  document.getElementById("qunFormBeizhu").value = item.beizhu || "";
+
+  // Hide subcodes creation block during basic edit (manage in drawer)
+  const subcodesBlock = document.getElementById("newQunSubcodesWrapper");
+  if (subcodesBlock) subcodesBlock.style.display = "none";
+
+  document.getElementById("qunModal").classList.add("show");
 }
 
 async function toggleQunStatus(id) {
@@ -652,47 +779,38 @@ async function toggleQunStatus(id) {
   }
 }
 
-async function resetQunPv(id) {
-  if (!confirm("确定要将此群活码的访问量清零吗？")) return;
-  const res = await apiRequest("/api/qun/reset-pv", "POST", { id });
-  if (res && res.code === 200) {
-    showToast("访问量已清零");
-    loadQunList();
-  }
-}
-
 async function deleteQun(id) {
-  if (!confirm("确定要删除该群活码吗？其下所有子码配置也将被删除！")) return;
+  if (!confirm("确定要删除该群活码吗？删除后所有进群子码将同步移除！")) return;
   const res = await apiRequest("/api/qun/delete", "POST", { id });
   if (res && res.code === 200) {
-    showToast("删除成功");
+    showToast("群活码已删除");
     loadQunList();
   }
 }
 
 // -------------------------------------------------------------
-// 子码 (Zima) 管理
+// 子码抽屉/详情 (Subcodes Drawer)
 // -------------------------------------------------------------
-async function openZimaModal(qunId) {
+async function openZimaDrawer(qunId) {
   STATE.currentQunId = qunId;
   const res = await apiRequest(`/api/qun/get?id=${qunId}`);
   if (!res || !res.data) {
-    showToast("获取群详情失败", "error");
+    showToast("获取群活码详情失败", "error");
     return;
   }
 
   const qun = res.data;
   document.getElementById("zimaModalTitle").textContent = `子码管理 - ${qun.title}`;
-  renderZimaList(qun.zima || []);
+  renderExistingZimaList(qun.zima || []);
   document.getElementById("zimaModal").classList.add("show");
 }
 
-function renderZimaList(zimaList) {
-  const listEl = document.getElementById("zimaListContainer");
-  listEl.innerHTML = "";
+function renderExistingZimaList(zimaList) {
+  const container = document.getElementById("zimaListContainer");
+  container.innerHTML = "";
 
   if (!zimaList || zimaList.length === 0) {
-    listEl.innerHTML = `<div class="empty-state" style="padding: 24px;"><p>暂无子码，请在下方点击上传新群二维码</p></div>`;
+    container.innerHTML = `<div class="empty-state" style="padding: 24px;"><p>暂无群二维码，请在下方点击上传新微信群二维码</p></div>`;
     return;
   }
 
@@ -708,24 +826,24 @@ function renderZimaList(zimaList) {
       align-items: center;
       gap: 16px;
       padding: 14px;
-      background: #f8fafc;
+      background: #ffffff;
       border: 1px solid var(--border-color);
       border-radius: var(--radius-md);
       margin-bottom: 12px;
     `;
 
     itemDiv.innerHTML = `
-      <div style="width: 60px; height: 60px; border-radius: 8px; overflow: hidden; background: #fff; border: 1px solid #e2e8f0; flex-shrink: 0;">
-        <img src="${zm.qrcode}" style="width: 100%; height: 100%; object-fit: contain;">
+      <div style="width: 64px; height: 64px; border-radius: 8px; overflow: hidden; background: #fff; border: 1px solid #e2e8f0; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+        <img src="${zm.qrcode}" style="max-width: 100%; max-height: 100%; object-fit: contain;">
       </div>
       <div style="flex: 1;">
         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-          <strong>子码 #${index + 1}</strong>
-          ${isFull ? '<span class="badge badge-danger">已满员</span>' : '<span class="badge badge-success">生效中</span>'}
+          <strong>第 ${index + 1} 顺位群码</strong>
+          ${isFull ? '<span class="badge badge-danger">已满员</span>' : '<span class="badge badge-success">进客中</span>'}
           ${zm.status !== 1 ? '<span class="badge badge-secondary">已暂停</span>' : ""}
         </div>
         <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">
-          阈值上限: ${max} 人 | 当前已进: ${pv} 人 | 群主微信: ${zm.leader || "未设置"}
+          阈值上限: ${max} 人 | 已进客: ${pv} 人 | 群主微信: ${zm.leader || "未填写"}
         </div>
         <div style="width: 100%; background: #e2e8f0; height: 6px; border-radius: 3px; overflow: hidden;">
           <div style="width: ${percent}%; height: 100%; background: ${isFull ? "var(--danger)" : "var(--primary)"}; border-radius: 3px;"></div>
@@ -733,40 +851,29 @@ function renderZimaList(zimaList) {
       </div>
       <div style="display: flex; flex-direction: column; gap: 6px;">
         <button class="btn btn-secondary btn-sm" onclick="toggleZimaStatus('${zm.id}')">${zm.status === 1 ? "暂停" : "启用"}</button>
+        <button class="btn btn-secondary btn-sm" onclick="resetZimaPv('${zm.id}')" title="清零该码访问量">🔄 清零</button>
         <button class="btn btn-danger btn-sm" onclick="deleteZima('${zm.id}')">删除</button>
       </div>
     `;
-    listEl.appendChild(itemDiv);
+    container.appendChild(itemDiv);
   });
 }
 
-async function uploadFileToBlob(file) {
-  const formData = new FormData();
-  formData.append("file", file);
-  const res = await apiRequest("/api/upload", "POST", formData);
-  if (res && res.code === 200) {
-    return res.data.url;
-  } else {
-    showToast(res?.msg || "上传失败", "error");
-    return null;
-  }
-}
-
-async function handleAddZima(e) {
+async function handleAddZimaInDrawer(e) {
   e.preventDefault();
   const qun_id = STATE.currentQunId;
   if (!qun_id) return;
 
-  const fileInput = document.getElementById("zimaFileInput");
-  const max_num = document.getElementById("zimaFormMax").value || 200;
-  const leader = document.getElementById("zimaFormLeader").value.trim();
+  const fileInput = document.getElementById("drawerZimaFileInput");
+  const max_num = document.getElementById("drawerZimaMaxNum").value || 200;
+  const leader = document.getElementById("drawerZimaLeader").value.trim();
 
   if (!fileInput.files || fileInput.files.length === 0) {
     showToast("请先选择群二维码图片文件", "error");
     return;
   }
 
-  showToast("正在上传群二维码至 EdgeOne Blob 存储...", "info");
+  showToast("正在上传群二维码至 EdgeOne Blob...", "info");
   const qrcodeUrl = await uploadFileToBlob(fileInput.files[0]);
   if (!qrcodeUrl) return;
 
@@ -778,10 +885,10 @@ async function handleAddZima(e) {
   });
 
   if (res && res.code === 200) {
-    showToast("子码添加成功");
+    showToast("群子码添加成功");
     fileInput.value = "";
-    document.getElementById("zimaFormLeader").value = "";
-    openZimaModal(qun_id); // Refresh
+    document.getElementById("drawerZimaLeader").value = "";
+    openZimaDrawer(qun_id);
     loadQunList();
   }
 }
@@ -791,7 +898,18 @@ async function toggleZimaStatus(zm_id) {
   const res = await apiRequest("/api/qun/zima/toggle", "POST", { qun_id, zm_id });
   if (res && res.code === 200) {
     showToast(res.msg);
-    openZimaModal(qun_id);
+    openZimaDrawer(qun_id);
+    loadQunList();
+  }
+}
+
+async function resetZimaPv(zm_id) {
+  if (!confirm("确定要将此子码的进群量清零吗？")) return;
+  const qun_id = STATE.currentQunId;
+  const res = await apiRequest("/api/qun/zima/reset-pv", "POST", { qun_id, zm_id });
+  if (res && res.code === 200) {
+    showToast("已清零进群计数");
+    openZimaDrawer(qun_id);
     loadQunList();
   }
 }
@@ -802,14 +920,26 @@ async function deleteZima(zm_id) {
   const res = await apiRequest("/api/qun/zima/delete", "POST", { qun_id, zm_id });
   if (res && res.code === 200) {
     showToast("子码已删除");
-    openZimaModal(qun_id);
+    openZimaDrawer(qun_id);
     loadQunList();
   }
 }
 
 // -------------------------------------------------------------
-// EdgeOne Blob 素材库
+// EdgeOne Blob 素材库 (Discovers all buckets and files)
 // -------------------------------------------------------------
+async function uploadFileToBlob(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await apiRequest("/api/upload", "POST", formData);
+  if (res && res.code === 200) {
+    return res.data.url;
+  } else {
+    showToast(res?.msg || "文件上传失败", "error");
+    return null;
+  }
+}
+
 async function loadBlobList() {
   const res = await apiRequest("/api/blob/list");
   if (res && res.data) {
@@ -823,7 +953,12 @@ function renderBlobGallery(list) {
   container.innerHTML = "";
 
   if (!list || list.length === 0) {
-    container.innerHTML = `<div class="empty-state" style="grid-column: 1/-1;"><div class="empty-icon">🖼️</div><p>暂无存储的素材图片，系统首次上传会自动创建存储桶</p></div>`;
+    container.innerHTML = `
+      <div class="empty-state" style="grid-column: 1/-1;">
+        <div class="empty-icon">🖼️</div>
+        <p>暂无素材图片。系统首次上传文件时会自动创建存储桶，也可点击右上角上传新图片</p>
+      </div>
+    `;
     return;
   }
 
@@ -842,12 +977,13 @@ function renderBlobGallery(list) {
     `;
 
     card.innerHTML = `
-      <div style="height: 160px; background: #f1f5f9; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-        <img src="${fullUrl}" style="max-height: 100%; max-width: 100%; object-fit: contain;">
+      <div style="height: 160px; background: #f8fafc; display: flex; align-items: center; justify-content: center; overflow: hidden; border-bottom: 1px solid #f1f5f9;">
+        <img src="${fullUrl}" style="max-height: 100%; max-width: 100%; object-fit: contain;" onerror="this.src='/static/img/noData.png'">
       </div>
       <div style="padding: 12px; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
-        <div style="font-size: 12px; color: var(--text-muted); word-break: break-all; margin-bottom: 8px;">
+        <div style="font-size: 11px; color: var(--text-muted); word-break: break-all; margin-bottom: 8px;">
           ${item.key}
+          <div style="color: #94a3b8; font-size: 10px; margin-top: 2px;">存储桶: ${item.storeName || 'dwz-blob'}</div>
         </div>
         <div style="display: flex; gap: 6px; justify-content: flex-end;">
           <button class="btn btn-secondary btn-sm" onclick="copyText('${fullUrl}')">复制链接</button>
@@ -867,7 +1003,7 @@ async function handleBlobUpload(e) {
   for (let i = 0; i < files.length; i++) {
     await uploadFileToBlob(files[i]);
   }
-  showToast("上传完成");
+  showToast("上传完成！");
   e.target.value = "";
   loadBlobList();
 }
@@ -878,6 +1014,68 @@ async function deleteBlobItem(key) {
   if (res && res.code === 200) {
     showToast("素材删除成功");
     loadBlobList();
+  }
+}
+
+// -------------------------------------------------------------
+// ⚡ 开放 API 文档与管理 (Open API)
+// -------------------------------------------------------------
+async function loadApiDocs() {
+  const res = await apiRequest("/api/system/api-key");
+  if (res && res.data) {
+    STATE.apiKey = res.data.apiKey;
+    const keyEl = document.getElementById("apiKeyDisplay");
+    if (keyEl) keyEl.textContent = STATE.apiKey;
+
+    // Update code examples
+    const origin = window.location.origin;
+    const curlEl = document.getElementById("apiCurlExample");
+    if (curlEl) {
+      curlEl.textContent = `curl -X POST "${origin}/api/dwz/create" \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: ${STATE.apiKey}" \\
+  -d '{"url": "https://example.com/item/12345"}'`;
+    }
+
+    const curlGetEl = document.getElementById("apiCurlGetExample");
+    if (curlGetEl) {
+      curlGetEl.textContent = `curl "${origin}/api/dwz/create?api_key=${STATE.apiKey}&url=https://example.com/item/12345&format=text"`;
+    }
+
+    const pyEl = document.getElementById("apiPythonExample");
+    if (pyEl) {
+      pyEl.textContent = `import requests
+
+res = requests.post(
+    "${origin}/api/dwz/create",
+    headers={"X-API-Key": "${STATE.apiKey}"},
+    json={"url": "https://example.com/item/12345"}
+)
+print(res.json()["data"]["shortUrl"])`;
+    }
+
+    const jsEl = document.getElementById("apiJsExample");
+    if (jsEl) {
+      jsEl.textContent = `const res = await fetch("${origin}/api/dwz/create", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "X-API-Key": "${STATE.apiKey}",
+  },
+  body: JSON.stringify({ url: "https://example.com/item/12345" }),
+});
+const data = await res.json();
+console.log("短网址:", data.data.shortUrl);`;
+    }
+  }
+}
+
+async function regenerateApiKey() {
+  if (!confirm("确定要重置 API Key 吗？旧的 API Key 将立即失效！")) return;
+  const res = await apiRequest("/api/system/api-key/regenerate", "POST");
+  if (res && res.code === 200) {
+    showToast("API Key 已成功重置！");
+    loadApiDocs();
   }
 }
 
@@ -915,7 +1113,6 @@ function closeModal(modalId) {
   document.getElementById(modalId).classList.remove("show");
 }
 
-let activeQrInstance = null;
 function showQrModal(url, title) {
   document.getElementById("qrModalTitle").textContent = title || "二维码预览";
   document.getElementById("qrModalLinkText").textContent = url;
@@ -923,7 +1120,7 @@ function showQrModal(url, title) {
   qrContainer.innerHTML = "";
 
   if (typeof QRCode !== "undefined") {
-    activeQrInstance = new QRCode(qrContainer, {
+    new QRCode(qrContainer, {
       text: url,
       width: 220,
       height: 220,
@@ -931,8 +1128,6 @@ function showQrModal(url, title) {
       colorLight: "#ffffff",
       correctLevel: QRCode.CorrectLevel.H,
     });
-  } else {
-    qrContainer.innerHTML = `<p style="color: red;">QRCode 库加载失败</p>`;
   }
 
   document.getElementById("qrModal").classList.add("show");

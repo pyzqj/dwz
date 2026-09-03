@@ -3,7 +3,7 @@
  * Route: /api/blob/*
  */
 
-import { getBlob } from "../../utils/storage.js";
+import { getBlobData } from "../../utils/storage.js";
 
 const MIME_TYPES = {
   png: "image/png",
@@ -21,23 +21,22 @@ const MIME_TYPES = {
 export default async function onRequest(context) {
   const { request } = context;
   const url = new URL(request.url);
-  const blobKey = url.pathname.replace(/^\/api\/blob\//, "");
+  const rawKey = url.pathname.replace(/^\/api\/blob\//, "");
+  const blobKey = decodeURIComponent(rawKey);
 
   if (!blobKey) {
     return new Response("Missing file key", { status: 400 });
   }
 
-  const blob = getBlob("dwz-blob");
-
   try {
-    const data = await blob.get(blobKey, { type: "arrayBuffer" });
+    const data = await getBlobData(blobKey);
     if (!data) {
       return new Response("File not found in Blob storage", { status: 404 });
     }
 
     const dotIdx = blobKey.lastIndexOf(".");
     const ext = dotIdx !== -1 ? blobKey.substring(dotIdx + 1).toLowerCase() : "";
-    const contentType = MIME_TYPES[ext] || "application/octet-stream";
+    const contentType = MIME_TYPES[ext] || "image/jpeg";
 
     return new Response(data, {
       status: 200,

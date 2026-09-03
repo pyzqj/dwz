@@ -1,24 +1,24 @@
 /**
- * EdgeOne Edge Function: REST API Endpoint
- * Handles: /api/*
+ * Tencent Cloud EdgeOne Full REST API Handler
+ * Handles:
+ * 1. Auth & Session (Web Crypto SHA-256) & API Key
+ * 2. System Overview Stats
+ * 3. Short URLs (dwz) CRUD & Open API (JSON & text formats)
+ * 4. Group Live Codes (qun) CRUD & Subcodes (zima) Management
+ * 5. Blob Materials Upload, Discovery (across all stores), and Management
  */
 
-import { getKV, getBlob } from "../utils/storage.js";
-import { authenticate, createSession, verifySession, hashPassword, jsonResponse, getAdminConfig } from "../utils/auth.js";
-
-function getTodayString() {
-  const d = new Date();
-  return d.toISOString().split("T")[0];
-}
-
-function getRandomKey(len = 6) {
-  const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  let res = "";
-  for (let i = 0; i < len; i++) {
-    res += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return res;
-}
+import { getKV, getBlob, getAllBlobs } from "../../utils/storage.js";
+import {
+  jsonResponse,
+  getRandomKey,
+  getTodayString,
+  hashPassword,
+  getAdminConfig,
+  authenticate,
+  createSession,
+  verifySession,
+} from "../../utils/auth.js";
 
 export default async function onRequest(context) {
   const { request } = context;
@@ -33,13 +33,39 @@ export default async function onRequest(context) {
       headers: {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-API-Key, X-Requested-With",
       },
     });
   }
 
   const kv = getKV(context);
   const blob = getBlob("dwz-blob");
+
+  // Helper to check authorization (supports Session or API Key)
+  async function checkAuth() {
+    // 1. Check Session Token
+    const session = await verifySession(request, kv);
+    if (session) return { ok: true, user: session.username };
+
+    // 2. Check API Key from header or query param
+    const apiKey =
+      request.headers.get("X-API-Key") ||
+      request.headers.get("x-api-key") ||
+      url.searchParams.get("api_key");
+
+    if (apiKey) {
+      let sysApiKey = await kv.get("system_api_key");
+      if (!sysApiKey) {
+        sysApiKey = "el_sec_" + getRandomKey(16);
+        await kv.put("system_api_key", sysApiKey);
+      }
+      if (apiKey === sysApiKey) {
+        return { ok: true, user: "api_client" };
+      }
+    }
+
+    return { ok: false };
+  }
 
   // -------------------------------------------------------------
   // Public Auth Routes
@@ -94,11 +120,137 @@ export default async function onRequest(context) {
   }
 
   // -------------------------------------------------------------
-  // Protected Routes Verification
+  // ⚡ Open API for Short URLs (dwz/create supports GET & POST)
   // -------------------------------------------------------------
-  const session = await verifySession(request, kv);
-  if (!session) {
+  if (path === "/dwz/create" && (method === "POST" || method === "GET")) {
+    const auth = await checkAuth();
+    if (!auth.ok) {
+      return jsonResponse({ code: 401, msg: "未授权，请提供有效登录凭证或 API Key (X-API-Key)" }, 401);
+    }
+
+    let targetUrl, title, key, type, format;
+
+    if (method === "POST") {
+      try {
+        const body = await request.json();
+        targetUrl = body.url;
+        title = body.title;
+        key = body.key;
+        type = body.type;
+        format = body.format;
+      } catch (e) {
+        return jsonResponse({ code: 400, msg: "JSON 请求体格式错误" }, 400);
+      }
+    } else {
+      // GET Query Parameters
+      targetUrl = url.searchParams.get("url");
+      title = url.searchParams.get("title");
+      key = url.searchParams.get("key");
+      type = url.searchParams.get("type");
+      format = url.searchParams.get("format");
+    }
+
+    if (!targetUrl) {
+      return jsonResponse({ code: 400, msg: "目标链接不能为空 (参数 url)" }, 400);
+    }
+
+    targetUrl = targetUrl.trim();
+    if (!targetUrl.startsWith("http://") && !targetUrl.startsWith("https://")) {
+      targetUrl = "https://" + targetUrl;
+    }
+
+    key = (key || "").trim();
+    if (!key) {
+      key = getRandomKey(6);
+    } else {
+      if (!/^[a-zA-Z0-9_-]{2,32}$/.test(key)) {
+        return jsonResponse({ code: 400, msg: "自定义短链仅限2-32位字母数字或下划线横线" }, 400);
+      }
+    }
+
+    // Check if key already exists
+    const existing = await kv.getJSON(`dwz_key_${key}`);
+    if (existing) {
+      return jsonResponse({ code: 400, msg: `短链 Key [${key}] 已被占用，请更换` }, 400);
+    }
+
+    let autoTitle = (title || "").trim();
+    if (!autoTitle) {
+      try {
+        const parsed = new URL(targetUrl);
+        autoTitle = `${parsed.hostname}_${key}`;
+      } catch {
+        autoTitle = "短网址_" + key;
+      }
+    }
+
+    const dwzItem = {
+      id: Date.now(),
+      title: autoTitle,
+      key,
+      url: targetUrl,
+      type: Number(type) || 1,
+      android_url: "",
+      ios_url: "",
+      windows_url: "",
+      status: 1,
+      pv: 0,
+      today_pv: { pv: 0, date: getTodayString() },
+      createdAt: Date.now(),
+      created_at: new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" }),
+    };
+
+    await kv.putJSON(`dwz_key_${key}`, dwzItem);
+
+    // Update index
+    const dwzIndex = (await kv.getJSON("dwz_index")) || [];
+    if (!dwzIndex.includes(key)) {
+      dwzIndex.unshift(key);
+      await kv.putJSON("dwz_index", dwzIndex);
+    }
+
+    const shortUrl = `${url.origin}/s/${key}`;
+
+    // If text format requested (convenient for curl/scripts/Shortcuts)
+    if (format === "text") {
+      return new Response(shortUrl, {
+        status: 200,
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      });
+    }
+
+    return jsonResponse({
+      code: 200,
+      msg: "创建短网址成功",
+      data: {
+        ...dwzItem,
+        shortUrl,
+      },
+    });
+  }
+
+  // -------------------------------------------------------------
+  // Protected Routes (Require Session or API Key)
+  // -------------------------------------------------------------
+  const auth = await checkAuth();
+  if (!auth.ok) {
     return jsonResponse({ code: 401, msg: "未登录或登录已过期" }, 401);
+  }
+
+  // API Key Management
+  if (path === "/system/api-key" && method === "GET") {
+    let key = await kv.get("system_api_key");
+    if (!key) {
+      key = "el_sec_" + getRandomKey(16);
+      await kv.put("system_api_key", key);
+    }
+    return jsonResponse({ code: 200, data: { apiKey: key } });
+  }
+
+  if (path === "/system/api-key/regenerate" && method === "POST") {
+    const newKey = "el_sec_" + getRandomKey(16);
+    await kv.put("system_api_key", newKey);
+    return jsonResponse({ code: 200, msg: "API Key 重置成功", data: { apiKey: newKey } });
   }
 
   // Change Password
@@ -184,7 +336,6 @@ export default async function onRequest(context) {
     for (const key of dwzIndex) {
       const item = await kv.getJSON(`dwz_key_${key}`);
       if (item) {
-        // compute today's pv if date matched
         const todayPvCount = item.today_pv && item.today_pv.date === today ? item.today_pv.pv : 0;
         list.push({
           ...item,
@@ -193,80 +344,8 @@ export default async function onRequest(context) {
       }
     }
 
-    // Sort by createdAt descending
     list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     return jsonResponse({ code: 200, data: list });
-  }
-
-  if (path === "/dwz/create" && method === "POST") {
-    const body = await request.json();
-    let { title, url: targetUrl, key, type = 1, android_url = "", ios_url = "", windows_url = "" } = body;
-
-    if (!targetUrl) {
-      return jsonResponse({ code: 400, msg: "目标链接不能为空" }, 400);
-    }
-    if (!targetUrl.startsWith("http://") && !targetUrl.startsWith("https://")) {
-      targetUrl = "https://" + targetUrl;
-    }
-
-    key = (key || "").trim();
-    if (!key) {
-      key = getRandomKey(6);
-    } else {
-      if (!/^[a-zA-Z0-9_-]{2,32}$/.test(key)) {
-        return jsonResponse({ code: 400, msg: "自定义短链仅限2-32位字母数字或下划线横线" }, 400);
-      }
-    }
-
-    // Check if key exists
-    const existing = await kv.getJSON(`dwz_key_${key}`);
-    if (existing) {
-      return jsonResponse({ code: 400, msg: `短链 Key [${key}] 已被占用，请更换` }, 400);
-    }
-
-    let autoTitle = (title || "").trim();
-    if (!autoTitle) {
-      try {
-        const parsed = new URL(targetUrl);
-        autoTitle = `${parsed.hostname}_${key}`;
-      } catch {
-        autoTitle = "短网址_" + key;
-      }
-    }
-
-    const dwzItem = {
-      id: Date.now(),
-      title: autoTitle,
-      key,
-      url: targetUrl,
-      type: Number(type) || 1,
-      android_url: android_url || "",
-      ios_url: ios_url || "",
-      windows_url: windows_url || "",
-      status: 1, // 1: 启用, 2: 停用
-      pv: 0,
-      today_pv: { pv: 0, date: getTodayString() },
-      createdAt: Date.now(),
-      created_at: new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" }),
-    };
-
-    await kv.putJSON(`dwz_key_${key}`, dwzItem);
-
-    // Update index
-    const dwzIndex = (await kv.getJSON("dwz_index")) || [];
-    if (!dwzIndex.includes(key)) {
-      dwzIndex.unshift(key);
-      await kv.putJSON("dwz_index", dwzIndex);
-    }
-
-    return jsonResponse({
-      code: 200,
-      msg: "创建短网址成功",
-      data: {
-        ...dwzItem,
-        shortUrl: `${url.origin}/s/${key}`,
-      },
-    });
   }
 
   if (path === "/dwz/update" && method === "POST") {
@@ -281,57 +360,63 @@ export default async function onRequest(context) {
     if (title !== undefined) dwzItem.title = title;
     if (targetUrl !== undefined) {
       let u = targetUrl.trim();
-      if (u && !u.startsWith("http://") && !u.startsWith("https://")) u = "https://" + u;
+      if (!u.startsWith("http://") && !u.startsWith("https://")) u = "https://" + u;
       dwzItem.url = u;
     }
-    if (type !== undefined) dwzItem.type = Number(type);
+    if (type !== undefined) dwzItem.type = Number(type) || 1;
     if (android_url !== undefined) dwzItem.android_url = android_url;
     if (ios_url !== undefined) dwzItem.ios_url = ios_url;
     if (windows_url !== undefined) dwzItem.windows_url = windows_url;
-    dwzItem.updatedAt = Date.now();
 
     await kv.putJSON(`dwz_key_${key}`, dwzItem);
-    return jsonResponse({ code: 200, msg: "修改短网址成功", data: dwzItem });
+    return jsonResponse({ code: 200, msg: "更新短网址成功", data: dwzItem });
   }
 
   if (path === "/dwz/toggle" && method === "POST") {
     const { key } = await request.json();
+    if (!key) return jsonResponse({ code: 400, msg: "缺少短网址 key" }, 400);
+
     const dwzItem = await kv.getJSON(`dwz_key_${key}`);
     if (!dwzItem) return jsonResponse({ code: 404, msg: "短网址不存在" }, 404);
 
     dwzItem.status = dwzItem.status === 1 ? 2 : 1;
     await kv.putJSON(`dwz_key_${key}`, dwzItem);
+
     return jsonResponse({
       code: 200,
-      msg: dwzItem.status === 1 ? "已开启该短网址" : "已暂停该短网址",
+      msg: dwzItem.status === 1 ? "已启用该短网址" : "已停用该短网址",
       data: { status: dwzItem.status },
     });
   }
 
   if (path === "/dwz/reset-pv" && method === "POST") {
     const { key } = await request.json();
+    if (!key) return jsonResponse({ code: 400, msg: "缺少短网址 key" }, 400);
+
     const dwzItem = await kv.getJSON(`dwz_key_${key}`);
     if (!dwzItem) return jsonResponse({ code: 404, msg: "短网址不存在" }, 404);
 
     dwzItem.pv = 0;
     dwzItem.today_pv = { pv: 0, date: getTodayString() };
     await kv.putJSON(`dwz_key_${key}`, dwzItem);
-    return jsonResponse({ code: 200, msg: "访问量已清零" });
+
+    return jsonResponse({ code: 200, msg: "访问量已成功清零" });
   }
 
   if (path === "/dwz/delete" && method === "POST") {
     const { key } = await request.json();
-    await kv.delete(`dwz_key_${key}`);
+    if (!key) return jsonResponse({ code: 400, msg: "缺少短网址 key" }, 400);
 
+    await kv.delete(`dwz_key_${key}`);
     const dwzIndex = (await kv.getJSON("dwz_index")) || [];
     const newIndex = dwzIndex.filter((k) => k !== key);
     await kv.putJSON("dwz_index", newIndex);
 
-    return jsonResponse({ code: 200, msg: "删除成功" });
+    return jsonResponse({ code: 200, msg: "短网址删除成功" });
   }
 
   // -------------------------------------------------------------
-  // 群活码 (qun) Management Routes
+  // 群活码 (qun) Management Routes (Rewritten Clean Logic)
   // -------------------------------------------------------------
   if (path === "/qun/list" && method === "GET") {
     const qunIndex = (await kv.getJSON("qun_index")) || [];
@@ -343,13 +428,19 @@ export default async function onRequest(context) {
       if (item) {
         const todayPvCount = item.today_pv && item.today_pv.date === today ? item.today_pv.pv : 0;
         const zimaList = item.zima || [];
-        const activeZimaCount = zimaList.filter((z) => z.status === 1).length;
+        const activeZima = zimaList.filter((z) => z.status === 1);
+        const totalCapacity = zimaList.reduce((sum, z) => sum + (Number(z.max_num) || 200), 0);
+        const totalJoined = zimaList.reduce((sum, z) => sum + (Number(z.pv) || 0), 0);
+        const currentActive = activeZima.find((z) => (Number(z.pv) || 0) < (Number(z.max_num) || 200));
 
         list.push({
           ...item,
           today_pv_count: todayPvCount,
           total_zima: zimaList.length,
-          active_zima: activeZimaCount,
+          active_zima_count: activeZima.length,
+          total_capacity: totalCapacity,
+          total_joined: totalJoined,
+          current_zima_num: currentActive ? zimaList.indexOf(currentActive) + 1 : 0,
         });
       }
     }
@@ -360,7 +451,7 @@ export default async function onRequest(context) {
 
   if (path === "/qun/get" && method === "GET") {
     const qid = url.searchParams.get("id");
-    if (!qid) return jsonResponse({ code: 400, msg: "缺少活码 ID" }, 400);
+    if (!qid) return jsonResponse({ code: 400, msg: "缺少活码 id" }, 400);
 
     const item = await kv.getJSON(`qun_data_${qid}`);
     if (!item) return jsonResponse({ code: 404, msg: "群活码不存在" }, 404);
@@ -370,237 +461,239 @@ export default async function onRequest(context) {
 
   if (path === "/qun/create" && method === "POST") {
     const body = await request.json();
-    const { title, qc = 1, safety = 1, kf_qrcode = "", kf_status = 0, beizhu = "" } = body;
+    const {
+      title,
+      beizhu = "",
+      qc = 1,
+      safety = 1,
+      kf_status = 0,
+      kf_qrcode = "",
+      zima = [],
+    } = body;
 
-    if (!title) {
+    if (!title || !title.trim()) {
       return jsonResponse({ code: 400, msg: "群活码标题不能为空" }, 400);
     }
 
-    const qid = Date.now();
+    const qid = String(Date.now()).substring(3);
+
+    // Process initial subcodes
+    const formattedZima = [];
+    if (Array.isArray(zima)) {
+      zima.forEach((zm, index) => {
+        if (zm.qrcode) {
+          formattedZima.push({
+            id: `zm_${Date.now()}_${index}`,
+            qrcode: zm.qrcode,
+            max_num: Number(zm.max_num) || 200,
+            pv: Number(zm.pv) || 0,
+            leader: (zm.leader || "").trim(),
+            status: 1,
+            created_at: new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" }),
+          });
+        }
+      });
+    }
+
     const qunItem = {
       id: qid,
-      title,
-      status: 1, // 1: 启用, 2: 停用
-      qc: Number(qc) || 0, // 1: 开启去重 (Cookie 7天固定展示首次扫码的子码)
-      safety: Number(safety) || 0, // 1: 展示安全认证提示绿标
-      kf_qrcode: kf_qrcode || "", // 客服二维码图片 (全满兜底)
-      kf_status: Number(kf_status) || 0,
-      beizhu: beizhu || "",
+      title: title.trim(),
+      beizhu: (beizhu || "").trim(),
+      qc: Number(qc) === 1 ? 1 : 0,
+      safety: Number(safety) === 1 ? 1 : 0,
+      kf_status: Number(kf_status) === 1 ? 1 : 0,
+      kf_qrcode: (kf_qrcode || "").trim(),
+      status: 1,
       pv: 0,
       today_pv: { pv: 0, date: getTodayString() },
       createdAt: Date.now(),
       created_at: new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" }),
-      zima: [], // 子码列表
+      zima: formattedZima,
     };
 
     await kv.putJSON(`qun_data_${qid}`, qunItem);
 
     const qunIndex = (await kv.getJSON("qun_index")) || [];
-    qunIndex.unshift(qid);
-    await kv.putJSON("qun_index", qunIndex);
+    if (!qunIndex.includes(qid)) {
+      qunIndex.unshift(qid);
+      await kv.putJSON("qun_index", qunIndex);
+    }
 
-    return jsonResponse({ code: 200, msg: "创建群活码成功", data: qunItem });
+    return jsonResponse({
+      code: 200,
+      msg: "创建群活码成功",
+      data: {
+        ...qunItem,
+        qunUrl: `${url.origin}/qun/${qid}`,
+      },
+    });
   }
 
   if (path === "/qun/update" && method === "POST") {
     const body = await request.json();
-    const { id, title, qc, safety, kf_qrcode, kf_status, beizhu } = body;
+    const { id, title, beizhu, qc, safety, kf_status, kf_qrcode, zima } = body;
 
-    if (!id) return jsonResponse({ code: 400, msg: "缺少活码 ID" }, 400);
+    if (!id) return jsonResponse({ code: 400, msg: "缺少活码 id" }, 400);
 
     const qunItem = await kv.getJSON(`qun_data_${id}`);
     if (!qunItem) return jsonResponse({ code: 404, msg: "群活码不存在" }, 404);
 
-    if (title !== undefined) qunItem.title = title;
-    if (qc !== undefined) qunItem.qc = Number(qc);
-    if (safety !== undefined) qunItem.safety = Number(safety);
-    if (kf_qrcode !== undefined) qunItem.kf_qrcode = kf_qrcode;
-    if (kf_status !== undefined) qunItem.kf_status = Number(kf_status);
-    if (beizhu !== undefined) qunItem.beizhu = beizhu;
-    qunItem.updatedAt = Date.now();
+    if (title !== undefined) qunItem.title = title.trim();
+    if (beizhu !== undefined) qunItem.beizhu = beizhu.trim();
+    if (qc !== undefined) qunItem.qc = Number(qc) === 1 ? 1 : 0;
+    if (safety !== undefined) qunItem.safety = Number(safety) === 1 ? 1 : 0;
+    if (kf_status !== undefined) qunItem.kf_status = Number(kf_status) === 1 ? 1 : 0;
+    if (kf_qrcode !== undefined) qunItem.kf_qrcode = kf_qrcode.trim();
+    if (Array.isArray(zima)) qunItem.zima = zima;
 
     await kv.putJSON(`qun_data_${id}`, qunItem);
-    return jsonResponse({ code: 200, msg: "修改群活码成功", data: qunItem });
+    return jsonResponse({ code: 200, msg: "更新群活码成功", data: qunItem });
   }
 
   if (path === "/qun/toggle" && method === "POST") {
     const { id } = await request.json();
+    if (!id) return jsonResponse({ code: 400, msg: "缺少活码 id" }, 400);
+
     const qunItem = await kv.getJSON(`qun_data_${id}`);
     if (!qunItem) return jsonResponse({ code: 404, msg: "群活码不存在" }, 404);
 
     qunItem.status = qunItem.status === 1 ? 2 : 1;
     await kv.putJSON(`qun_data_${id}`, qunItem);
+
     return jsonResponse({
       code: 200,
-      msg: qunItem.status === 1 ? "已开启该群活码" : "已暂停该群活码",
+      msg: qunItem.status === 1 ? "已启用该活码" : "已停用该活码",
       data: { status: qunItem.status },
     });
   }
 
   if (path === "/qun/reset-pv" && method === "POST") {
     const { id } = await request.json();
+    if (!id) return jsonResponse({ code: 400, msg: "缺少活码 id" }, 400);
+
     const qunItem = await kv.getJSON(`qun_data_${id}`);
     if (!qunItem) return jsonResponse({ code: 404, msg: "群活码不存在" }, 404);
 
     qunItem.pv = 0;
     qunItem.today_pv = { pv: 0, date: getTodayString() };
+    if (Array.isArray(qunItem.zima)) {
+      qunItem.zima.forEach((zm) => {
+        zm.pv = 0;
+      });
+    }
     await kv.putJSON(`qun_data_${id}`, qunItem);
-    return jsonResponse({ code: 200, msg: "访问量已清零" });
+
+    return jsonResponse({ code: 200, msg: "群活码及所有子码访问量已全部清零" });
   }
 
   if (path === "/qun/delete" && method === "POST") {
     const { id } = await request.json();
-    await kv.delete(`qun_data_${id}`);
+    if (!id) return jsonResponse({ code: 400, msg: "缺少活码 id" }, 400);
 
+    await kv.delete(`qun_data_${id}`);
     const qunIndex = (await kv.getJSON("qun_index")) || [];
-    const newIndex = qunIndex.filter((qid) => String(qid) !== String(id));
+    const newIndex = qunIndex.filter((qid) => qid !== id);
     await kv.putJSON("qun_index", newIndex);
 
-    return jsonResponse({ code: 200, msg: "删除成功" });
+    return jsonResponse({ code: 200, msg: "群活码删除成功" });
   }
 
-  // -------------------------------------------------------------
-  // 群子码 (zima) Management Routes
-  // -------------------------------------------------------------
+  // Subcodes (Zima) Operations
   if (path === "/qun/zima/add" && method === "POST") {
-    const body = await request.json();
-    const { qun_id, qrcode, max_num = 200, leader = "" } = body;
+    const { qun_id, qrcode, max_num = 200, leader = "" } = await request.json();
 
     if (!qun_id || !qrcode) {
-      return jsonResponse({ code: 400, msg: "请上传群二维码图片" }, 400);
+      return jsonResponse({ code: 400, msg: "缺少群活码 ID 或二维码图片地址" }, 400);
     }
 
     const qunItem = await kv.getJSON(`qun_data_${qun_id}`);
     if (!qunItem) return jsonResponse({ code: 404, msg: "群活码不存在" }, 404);
 
+    if (!Array.isArray(qunItem.zima)) qunItem.zima = [];
+
     const newZima = {
-      id: Date.now(),
-      qrcode,
+      id: `zm_${Date.now()}_${getRandomKey(4)}`,
+      qrcode: qrcode.trim(),
       max_num: Number(max_num) || 200,
       pv: 0,
-      status: 1, // 1: 启用, 2: 停用
-      leader: leader || "",
-      createdAt: Date.now(),
+      leader: (leader || "").trim(),
+      status: 1,
+      created_at: new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" }),
     };
 
-    if (!Array.isArray(qunItem.zima)) qunItem.zima = [];
     qunItem.zima.push(newZima);
-
     await kv.putJSON(`qun_data_${qun_id}`, qunItem);
+
     return jsonResponse({ code: 200, msg: "添加子码成功", data: newZima });
-  }
-
-  if (path === "/qun/zima/update" && method === "POST") {
-    const body = await request.json();
-    const { qun_id, zm_id, qrcode, max_num, leader, pv } = body;
-
-    const qunItem = await kv.getJSON(`qun_data_${qun_id}`);
-    if (!qunItem) return jsonResponse({ code: 404, msg: "群活码不存在" }, 404);
-
-    const zima = (qunItem.zima || []).find((z) => String(z.id) === String(zm_id));
-    if (!zima) return jsonResponse({ code: 404, msg: "子码不存在" }, 404);
-
-    if (qrcode !== undefined) zima.qrcode = qrcode;
-    if (max_num !== undefined) zima.max_num = Number(max_num);
-    if (leader !== undefined) zima.leader = leader;
-    if (pv !== undefined) zima.pv = Number(pv);
-
-    await kv.putJSON(`qun_data_${qun_id}`, qunItem);
-    return jsonResponse({ code: 200, msg: "修改子码成功", data: zima });
   }
 
   if (path === "/qun/zima/toggle" && method === "POST") {
     const { qun_id, zm_id } = await request.json();
     const qunItem = await kv.getJSON(`qun_data_${qun_id}`);
-    if (!qunItem) return jsonResponse({ code: 404, msg: "群活码不存在" }, 404);
+    if (!qunItem || !Array.isArray(qunItem.zima)) return jsonResponse({ code: 404, msg: "群或子码不存在" }, 404);
 
-    const zima = (qunItem.zima || []).find((z) => String(z.id) === String(zm_id));
-    if (!zima) return jsonResponse({ code: 404, msg: "子码不存在" }, 404);
+    const zm = qunItem.zima.find((z) => z.id === zm_id);
+    if (!zm) return jsonResponse({ code: 404, msg: "子码不存在" }, 404);
 
-    zima.status = zima.status === 1 ? 2 : 1;
+    zm.status = zm.status === 1 ? 2 : 1;
     await kv.putJSON(`qun_data_${qun_id}`, qunItem);
-    return jsonResponse({ code: 200, msg: zima.status === 1 ? "子码已启用" : "子码已暂停" });
-  }
 
-  if (path === "/qun/zima/reset-pv" && method === "POST") {
-    const { qun_id, zm_id } = await request.json();
-    const qunItem = await kv.getJSON(`qun_data_${qun_id}`);
-    if (!qunItem) return jsonResponse({ code: 404, msg: "群活码不存在" }, 404);
-
-    const zima = (qunItem.zima || []).find((z) => String(z.id) === String(zm_id));
-    if (!zima) return jsonResponse({ code: 404, msg: "子码不存在" }, 404);
-
-    zima.pv = 0;
-    await kv.putJSON(`qun_data_${qun_id}`, qunItem);
-    return jsonResponse({ code: 200, msg: "子码访问量已清零" });
+    return jsonResponse({ code: 200, msg: zm.status === 1 ? "已启用该子码" : "已暂停该子码" });
   }
 
   if (path === "/qun/zima/delete" && method === "POST") {
     const { qun_id, zm_id } = await request.json();
     const qunItem = await kv.getJSON(`qun_data_${qun_id}`);
-    if (!qunItem) return jsonResponse({ code: 404, msg: "群活码不存在" }, 404);
+    if (!qunItem || !Array.isArray(qunItem.zima)) return jsonResponse({ code: 404, msg: "群或子码不存在" }, 404);
 
-    qunItem.zima = (qunItem.zima || []).filter((z) => String(z.id) !== String(zm_id));
+    qunItem.zima = qunItem.zima.filter((z) => z.id !== zm_id);
     await kv.putJSON(`qun_data_${qun_id}`, qunItem);
+
     return jsonResponse({ code: 200, msg: "子码删除成功" });
   }
 
+  if (path === "/qun/zima/reset-pv" && method === "POST") {
+    const { qun_id, zm_id } = await request.json();
+    const qunItem = await kv.getJSON(`qun_data_${qun_id}`);
+    if (!qunItem || !Array.isArray(qunItem.zima)) return jsonResponse({ code: 404, msg: "群或子码不存在" }, 404);
+
+    const zm = qunItem.zima.find((z) => z.id === zm_id);
+    if (!zm) return jsonResponse({ code: 404, msg: "子码不存在" }, 404);
+
+    zm.pv = 0;
+    await kv.putJSON(`qun_data_${qun_id}`, qunItem);
+
+    return jsonResponse({ code: 200, msg: "子码访问量已清零" });
+  }
+
   // -------------------------------------------------------------
-  // EdgeOne Blob Upload & Material Management
+  // Blob Materials Upload & Discovery Routes
   // -------------------------------------------------------------
   if (path === "/upload" && method === "POST") {
     try {
-      const contentType = request.headers.get("content-type") || "";
+      const formData = await request.formData();
+      const file = formData.get("file");
 
-      let buffer;
-      let filename = "";
-      let ext = "png";
-
-      if (contentType.includes("multipart/form-data")) {
-        const formData = await request.formData();
-        const file = formData.get("file");
-        if (!file || typeof file.arrayBuffer !== "function") {
-          return jsonResponse({ code: 400, msg: "未找到上传的文件" }, 400);
-        }
-        buffer = new Uint8Array(await file.arrayBuffer());
-        filename = file.name || "upload.png";
-        const dotIdx = filename.lastIndexOf(".");
-        if (dotIdx !== -1) ext = filename.substring(dotIdx + 1).toLowerCase();
-      } else if (contentType.includes("application/json")) {
-        const json = await request.json();
-        const base64Data = json.base64 || "";
-        filename = json.filename || "upload.png";
-        const match = base64Data.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
-        if (match) {
-          ext = match[1].toLowerCase();
-          const binary = atob(match[2]);
-          const bytes = new Uint8Array(binary.length);
-          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-          buffer = bytes;
-        } else {
-          return jsonResponse({ code: 400, msg: "Base64 图片格式无效" }, 400);
-        }
-      } else {
-        buffer = new Uint8Array(await request.arrayBuffer());
+      if (!file || typeof file.arrayBuffer !== "function") {
+        return jsonResponse({ code: 400, msg: "未检测到上传的文件" }, 400);
       }
 
-      if (!buffer || buffer.length === 0) {
-        return jsonResponse({ code: 400, msg: "文件内容为空" }, 400);
-      }
+      const originalName = file.name || "image.png";
+      const dotIdx = originalName.lastIndexOf(".");
+      const ext = dotIdx !== -1 ? originalName.substring(dotIdx) : ".png";
+      const key = `uploads/${Date.now()}_${getRandomKey(6)}${ext}`;
 
-      // Generate unique key
-      const key = `uploads/${Date.now()}_${getRandomKey(8)}.${ext}`;
-      await blob.set(key, buffer, { cacheControl: "public, max-age=31536000, immutable" });
+      const buffer = await file.arrayBuffer();
+      await blob.set(key, buffer, {
+        cacheControl: "public, max-age=31536000, immutable",
+      });
 
-      const fileUrl = `/api/blob/${key}`;
       return jsonResponse({
         code: 200,
-        msg: "上传成功",
+        msg: "文件上传成功",
         data: {
-          url: fileUrl,
           key,
-          size: buffer.length,
-          name: filename,
+          url: `/api/blob/${key}`,
         },
       });
     } catch (err) {
@@ -610,15 +703,16 @@ export default async function onRequest(context) {
 
   if (path === "/blob/list" && method === "GET") {
     try {
-      const list = await blob.list({ prefix: "uploads/" });
-      const blobs = list.blobs || [];
+      // Discovers all blobs across all stores (without prefix filters)
+      const blobs = await getAllBlobs();
       return jsonResponse({
         code: 200,
         data: blobs.map((b) => ({
           key: b.key,
-          url: `/api/blob/${b.key}`,
+          url: `/api/blob/${encodeURIComponent(b.key)}`,
+          storeName: b.storeName,
           size: b.size,
-          lastModified: b.uploadedAt || b.lastModified,
+          etag: b.etag,
         })),
       });
     } catch (err) {
@@ -638,5 +732,5 @@ export default async function onRequest(context) {
   }
 
   // 404 Fallback
-  return jsonResponse({ code: 404, msg: "API 端点不存在: " + path }, 404);
+  return jsonResponse({ code: 404, msg: `API 接口未找到: ${method} ${path}` }, 404);
 }

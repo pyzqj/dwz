@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <base href="/console/">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
-  <title>EdgeOne 智能控制台 | 短网址与群活码系统</title>
+  <title>EdgeLink 极连 | 智能短网址与群活码边缘系统</title>
   <link rel="shortcut icon" href="/static/img/favicon.ico">
   <link rel="stylesheet" href="/console/style.css">
   <script src="/static/js/qrcode.min.js"></script>
@@ -13,18 +13,16 @@
   <!-- Toast Container -->
   <div class="toast-container" id="toastContainer"></div>
 
+  <!-- Mobile Sidebar Overlay -->
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeMobileMenu()"></div>
+
   <!-- Login Overlay -->
   <div class="auth-overlay" id="authOverlay" style="display: none;">
     <div class="auth-card">
       <div class="logo-badge">⚡</div>
-      <h2>EdgeOne 智能控制台</h2>
-      <p>短网址 & 群活码边缘调度管理系统</p>
+      <h2>EdgeLink 极连控制台</h2>
+      <p>短网址 & 群活码边缘分布式调度系统</p>
       
-      <!-- Preview Environment Notice -->
-      <div id="previewWarningBanner" style="display: none; background: #fffbeb; border: 1px solid #fef3c7; color: #b45309; padding: 12px; border-radius: 8px; font-size: 12px; margin-bottom: 16px; text-align: left; line-height: 1.5;">
-        ⚠️ <strong>提示</strong>：如遇 401 拦截，请从 EdgeOne 控制台点击【预览】打开带有效签名的链接，或在 EdgeOne 控制台项目设置中关闭【预览保护】/ 绑定自定义域名。
-      </div>
-
       <form id="loginForm" onsubmit="handleLogin(event)">
         <div class="form-group" style="text-align: left;">
           <label class="form-label">管理员账号</label>
@@ -43,10 +41,10 @@
     <!-- Sidebar Navigation -->
     <aside class="sidebar">
       <div class="sidebar-header">
-        <div class="logo-badge">🚀</div>
+        <div class="logo-badge">⚡</div>
         <div class="logo-text">
-          <h1>引流宝 EdgeOne</h1>
-          <p>KV & Blob 原生架构</p>
+          <h1>EdgeLink 极连</h1>
+          <p>EdgeOne 原生边缘架构</p>
         </div>
       </div>
 
@@ -67,6 +65,10 @@
           <span class="icon">🖼️</span>
           <span>Blob 素材库</span>
         </button>
+        <button class="nav-item" data-tab="api" onclick="switchTab('api')">
+          <span class="icon">⚡</span>
+          <span>开放 API 文档</span>
+        </button>
         <button class="nav-item" data-tab="settings" onclick="switchTab('settings')">
           <span class="icon">⚙️</span>
           <span>系统设置</span>
@@ -74,7 +76,7 @@
       </nav>
 
       <div class="sidebar-footer">
-        <span>v3.0.0 EdgeOne</span>
+        <span>EdgeLink v3.2</span>
         <button onclick="handleLogout()" style="background: none; border: none; color: #94a3b8; cursor: pointer;" title="退出登录">🚪 退出</button>
       </div>
     </aside>
@@ -84,12 +86,13 @@
       <!-- Top Sticky Header -->
       <header class="top-header">
         <div class="header-left">
+          <button class="mobile-menu-btn" onclick="toggleMobileMenu()" title="打开菜单">☰</button>
           <h2 class="page-title" id="currentPageTitle">概览面板</h2>
         </div>
         <div class="header-right">
           <div class="status-pill">
             <span class="status-dot"></span>
-            <span id="runtimeStatusBadge">边缘节点在线</span>
+            <span id="runtimeStatusBadge">EdgeOne 边缘在线</span>
           </div>
           <div class="user-badge">
             <span>👤</span>
@@ -108,10 +111,10 @@
           <div class="quick-generate-box">
             <div class="quick-generate-title">
               <span>⚡ 极速生成短网址</span>
-              <small style="font-size: 12px; color: #94a3b8; font-weight: normal;">（粘贴长链接，一键自动生成并复制短链）</small>
+              <small style="font-size: 12px; color: #94a3b8; font-weight: normal;">（直接粘贴长链接，系统自动秒出短链并复制）</small>
             </div>
             <form onsubmit="handleQuickGenerate(event, 'quickUrlInputOverview')" class="quick-generate-form">
-              <input type="url" id="quickUrlInputOverview" class="quick-generate-input" placeholder="输入或粘贴长链接 (例如 https://example.com/long/path/12345)..." required>
+              <input type="url" id="quickUrlInputOverview" class="quick-generate-input" placeholder="输入或粘贴长链接 (例如 https://example.com/item/12345)..." required>
               <button type="submit" class="btn btn-primary quick-generate-btn">⚡ 一键生成短网址</button>
             </form>
           </div>
@@ -161,17 +164,18 @@
               <button class="btn btn-primary" onclick="openCreateDwzModal()">+ 高级新建短网址</button>
               <button class="btn btn-primary" onclick="openCreateQunModal()">+ 新建群活码</button>
               <button class="btn btn-secondary" onclick="switchTab('blob')">📁 管理 Blob 素材</button>
+              <button class="btn btn-secondary" onclick="switchTab('api')">⚡ 查看开放 API</button>
               <a href="/" target="_blank" class="btn btn-secondary">🌐 访问系统首页</a>
             </div>
           </div>
 
           <!-- System Architecture Info -->
           <div class="card-table" style="padding: 24px;">
-            <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 12px;">☁️ 腾讯云 EdgeOne 运行状态</h3>
+            <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 12px;">☁️ EdgeLink 边缘无服务架构已就绪</h3>
             <p style="font-size: 14px; color: var(--text-muted); line-height: 1.8;">
-              1. <strong>KV 数据库</strong>：短链配置、活码与访问量实时存储于腾讯云 EdgeOne KV，边缘节点毫秒级查询。<br>
-              2. <strong>Blob 文件存储</strong>：无需手动配置，首次上传文件时系统通过 SDK 自动创建 Blob 存储桶，并通过 <code>/api/blob/*</code> 全球 CDN 加速分发。<br>
-              3. <strong>设备分流与防封</strong>：支持微信内环境专跳、移动浏览器防拦截引导、多群子码自动阈值轮换与 7 天去重机制。
+              1. <strong>高可用短网址</strong>：支持一键秒级生成、微信内置专跳、仅手机浏览器防拦截以及 iOS / Android 设备精准分流。<br>
+              2. <strong>智能群活码</strong>：群满自动平滑切换至下一个群二维码，配备 7 天防重复进群去重与微信官方安全认证绿标，群全满时客服微信自动兜底。<br>
+              3. <strong>原生 KV & Blob 存储</strong>：所有数据持久化在腾讯云 EdgeOne KV，图片自动托管于 EdgeOne Blob 全球 CDN 毫秒级回显。
             </p>
           </div>
         </section>
@@ -195,7 +199,10 @@
             <div class="search-bar">
               <input type="text" id="dwzSearchInput" class="search-input" placeholder="搜索短网址标题、Key 或目标链接..." oninput="filterDwz()">
             </div>
-            <button class="btn btn-secondary" onclick="openCreateDwzModal()">⚙️ 高级配置新建</button>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-secondary" onclick="switchTab('api')">⚡ 开放 API</button>
+              <button class="btn btn-secondary" onclick="openCreateDwzModal()">⚙️ 高级配置新建</button>
+            </div>
           </div>
 
           <div class="card-table">
@@ -226,7 +233,7 @@
             <div class="search-bar">
               <input type="text" id="qunSearchInput" class="search-input" placeholder="搜索群活码标题..." oninput="filterQun()">
             </div>
-            <button class="btn btn-primary" onclick="openCreateQunModal()">+ 新建群活码</button>
+            <button class="btn btn-primary" onclick="openCreateQunModal()">+ 新建群活码 (一站式配置)</button>
           </div>
 
           <div class="card-table">
@@ -234,9 +241,9 @@
               <table>
                 <thead>
                   <tr>
-                    <th>群活码名称 / 创建时间</th>
-                    <th>子码池</th>
-                    <th>安全认证 / 去重</th>
+                    <th>群活码名称 / ID</th>
+                    <th>子码池状态</th>
+                    <th>安全机制</th>
                     <th>总访问 / 今日</th>
                     <th>状态</th>
                     <th>操作</th>
@@ -253,7 +260,10 @@
         <!-- Tab 4: Blob Materials Library -->
         <section class="tab-pane" id="tab-blob">
           <div class="section-header">
-            <h3 class="section-title">🖼️ 已上传素材 (EdgeOne Blob 自动托管)</h3>
+            <div>
+              <h3 class="section-title">🖼️ 已上传素材 (EdgeOne Blob 自动全盘托管)</h3>
+              <p style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">展示 EdgeOne 控制台及系统所有已存储的图片对象，点击可快速复制直链</p>
+            </div>
             <label class="btn btn-primary" style="cursor: pointer;">
               <span>+ 上传新图片到 Blob</span>
               <input type="file" accept="image/*" multiple style="display: none;" onchange="handleBlobUpload(event)">
@@ -265,7 +275,69 @@
           </div>
         </section>
 
-        <!-- Tab 5: System Settings -->
+        <!-- Tab 5: Open API Documentation -->
+        <section class="tab-pane" id="tab-api">
+          <div class="card-table" style="padding: 28px; max-width: 900px; margin-bottom: 24px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+              <div>
+                <h3 style="font-size: 18px; font-weight: 700;">⚡ 短网址开放 API 使用指南</h3>
+                <p style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">通过 API 可无缝接入各种自动化脚本、Alfred、Raycast、iOS 快捷指令或第三方业务系统</p>
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <button class="btn btn-secondary btn-sm" onclick="regenerateApiKey()">🔄 重置 API Key</button>
+              </div>
+            </div>
+
+            <!-- API Key Card -->
+            <div style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: 10px; padding: 16px; margin-bottom: 24px;">
+              <div style="font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px;">您的永久专属 API Key：</div>
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <code id="apiKeyDisplay" style="background: #e2e8f0; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 14px; color: var(--primary);">正在加载...</code>
+                <button class="btn btn-primary btn-sm" onclick="copyText(document.getElementById('apiKeyDisplay').textContent)">📋 复制 Key</button>
+              </div>
+            </div>
+
+            <!-- API Endpoints -->
+            <h4 style="font-size: 15px; font-weight: 700; margin-bottom: 8px;">1. 极速 GET 请求（返回纯文本短链接，超适合快捷指令与命令行）</h4>
+            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px;">在 URL 中带上 <code>format=text</code> 参数，接口将直接返回纯文本格式的短网址：</p>
+            <div class="code-block-container">
+              <div class="code-header">
+                <span>cURL (GET 请求纯文本)</span>
+                <button class="btn btn-secondary btn-sm" onclick="copyText(document.getElementById('apiCurlGetExample').textContent)">复制</button>
+              </div>
+              <pre class="code-content" id="apiCurlGetExample">加载中...</pre>
+            </div>
+
+            <h4 style="font-size: 15px; font-weight: 700; margin-top: 24px; margin-bottom: 8px;">2. 标准 POST 请求（JSON 格式响应）</h4>
+            <div class="code-block-container">
+              <div class="code-header">
+                <span>cURL (POST 请求)</span>
+                <button class="btn btn-secondary btn-sm" onclick="copyText(document.getElementById('apiCurlExample').textContent)">复制</button>
+              </div>
+              <pre class="code-content" id="apiCurlExample">加载中...</pre>
+            </div>
+
+            <h4 style="font-size: 15px; font-weight: 700; margin-top: 24px; margin-bottom: 8px;">3. Python 接入示例</h4>
+            <div class="code-block-container">
+              <div class="code-header">
+                <span>Python 3</span>
+                <button class="btn btn-secondary btn-sm" onclick="copyText(document.getElementById('apiPythonExample').textContent)">复制</button>
+              </div>
+              <pre class="code-content" id="apiPythonExample">加载中...</pre>
+            </div>
+
+            <h4 style="font-size: 15px; font-weight: 700; margin-top: 24px; margin-bottom: 8px;">4. JavaScript / Node.js 接入示例</h4>
+            <div class="code-block-container">
+              <div class="code-header">
+                <span>JavaScript (fetch)</span>
+                <button class="btn btn-secondary btn-sm" onclick="copyText(document.getElementById('apiJsExample').textContent)">复制</button>
+              </div>
+              <pre class="code-content" id="apiJsExample">加载中...</pre>
+            </div>
+          </div>
+        </section>
+
+        <!-- Tab 6: System Settings -->
         <section class="tab-pane" id="tab-settings">
           <div class="card-table" style="max-width: 600px; padding: 32px;">
             <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px;">修改管理员密码</h3>
@@ -382,61 +454,82 @@
     </div>
   </div>
 
-  <!-- Modal: Create/Edit Group Live Code -->
+  <!-- Modal: Unified Group Live Code (qun) Creation / Edit -->
   <div class="modal-backdrop" id="qunModal">
-    <div class="modal-card">
+    <div class="modal-card modal-card-large">
       <div class="modal-header">
-        <h3 id="qunModalTitle">新建群活码</h3>
+        <h3 id="qunModalTitle">新建群活码 (一站式配置)</h3>
         <button class="modal-close" onclick="closeModal('qunModal')">&times;</button>
       </div>
       <form id="qunForm" onsubmit="handleQunSubmit(event)">
         <div class="modal-body">
           <input type="hidden" id="qunFormId">
 
+          <!-- Basic Info -->
           <div class="form-group">
-            <label class="form-label">群活码标题</label>
-            <input type="text" id="qunFormTitle" class="form-input" placeholder="例如：VIP 核心客户交流群" required>
-          </div>
-
-          <div class="form-group" style="display: flex; gap: 24px;">
-            <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer;">
-              <input type="checkbox" id="qunFormQc" checked>
-              <span>开启7天去重 (老用户固定展示首个入群码)</span>
-            </label>
-          </div>
-
-          <div class="form-group" style="display: flex; gap: 24px;">
-            <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer;">
-              <input type="checkbox" id="qunFormSafety" checked>
-              <span>展示微信官方安全认证绿标</span>
-            </label>
+            <label class="form-label">群活码名称 <span style="color: var(--danger);">*</span></label>
+            <input type="text" id="qunFormTitle" class="form-input" placeholder="例如：2026 官方VIP交流群" required>
           </div>
 
           <div class="form-group">
-            <label class="form-label">进群说明 / 公告备注</label>
-            <textarea id="qunFormBeizhu" class="form-textarea" rows="3" placeholder="例如：进群后请遵守群规，禁止广告，加群主微信领取福利。"></textarea>
+            <label class="form-label">进群说明 / 欢迎语 <small>(展示在微信落地页二维码下方)</small></label>
+            <textarea id="qunFormBeizhu" class="form-textarea" rows="2" placeholder="例如：进群后请遵守群规，禁止发广告，加群主微信领取新人资料包。"></textarea>
           </div>
 
-          <div style="background: #f8fafc; padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-top: 16px;">
-            <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 10px;">
-              <input type="checkbox" id="qunFormKfStatus">
-              <span>启用群满客服二维码兜底</span>
-            </label>
-            <div class="form-group" style="margin-bottom: 0;">
-              <label class="form-label">客服二维码图片地址</label>
-              <input type="text" id="qunFormKfQrcode" class="form-input" placeholder="可在素材库上传后粘贴 /api/blob/... 链接">
+          <!-- Subcodes Selection in Creation Flow -->
+          <div id="newQunSubcodesWrapper" style="background: #f8fafc; padding: 18px; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+              <div>
+                <strong style="font-size: 14px;">微信群二维码列表 (按顺序自动轮换)</strong>
+                <div style="font-size: 12px; color: var(--text-muted);">满设定的阈值人数后，系统自动平滑切换到下一个群二维码</div>
+              </div>
+              <label class="btn btn-primary btn-sm" style="cursor: pointer;">
+                <span>+ 批量添加群二维码</span>
+                <input type="file" id="groupBatchFileInput" accept="image/*" multiple style="display: none;" onchange="handleBatchAddGroupImages(event)">
+              </label>
+            </div>
+
+            <!-- List of Subcodes -->
+            <div id="newQunSubcodesContainer"></div>
+          </div>
+
+          <!-- Advanced Strategy Options -->
+          <div style="border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px;">
+            <h4 style="font-size: 14px; font-weight: 700; margin-bottom: 12px; color: var(--text-main);">高级防封与转化策略</h4>
+            
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer;">
+                <input type="checkbox" id="qunFormSafety" checked>
+                <span>🛡️ 展示微信官方安全认证绿标（增加信任感，显著提升扫码转化率）</span>
+              </label>
+
+              <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer;">
+                <input type="checkbox" id="qunFormQc" checked>
+                <span>🔄 开启 7 天去重 Cookie（同一用户 7 天内固定展示首个扫到的群，防止重复进群）</span>
+              </label>
+            </div>
+
+            <div style="margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border-color);">
+              <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 8px;">
+                <input type="checkbox" id="qunFormKfStatus">
+                <span>👤 启用群满个人客服二维码兜底</span>
+              </label>
+              <div class="form-group" style="margin-bottom: 0;">
+                <input type="text" id="qunFormKfQrcode" class="form-input" placeholder="粘贴客服二维码直链 (可在素材库上传后复制 /api/blob/... 链接)">
+              </div>
             </div>
           </div>
+
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeModal('qunModal')">取消</button>
-          <button type="submit" class="btn btn-primary">保存群活码</button>
+          <button type="submit" class="btn btn-primary">保存并发布群活码</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- Modal: Manage Subcodes (zima) -->
+  <!-- Modal: Subcode Drawer (Manage Existing Subcodes) -->
   <div class="modal-backdrop" id="zimaModal">
     <div class="modal-card modal-card-large">
       <div class="modal-header">
@@ -444,29 +537,27 @@
         <button class="modal-close" onclick="closeModal('zimaModal')">&times;</button>
       </div>
       <div class="modal-body">
-        <div id="zimaListContainer">
-          <!-- Populated by JS -->
-        </div>
+        <div id="zimaListContainer"></div>
 
         <!-- Add New Subcode Form -->
         <div style="margin-top: 24px; padding-top: 20px; border-top: 1px dashed var(--border-color);">
-          <h4 style="font-size: 15px; font-weight: 700; margin-bottom: 14px;">+ 上传添加新微信群二维码 (自动存入 EdgeOne Blob)</h4>
-          <form id="addZimaForm" onsubmit="handleAddZima(event)">
+          <h4 style="font-size: 15px; font-weight: 700; margin-bottom: 14px;">+ 追加新微信群二维码 (直接存入 EdgeOne Blob)</h4>
+          <form id="addZimaFormDrawer" onsubmit="handleAddZimaInDrawer(event)">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 14px;">
               <div class="form-group" style="margin-bottom: 0;">
                 <label class="form-label">选择微信群二维码图片</label>
-                <input type="file" id="zimaFileInput" class="form-input" accept="image/*" required>
+                <input type="file" id="drawerZimaFileInput" class="form-input" accept="image/*" required>
               </div>
               <div class="form-group" style="margin-bottom: 0;">
-                <label class="form-label">扫码阈值人数 (达到后自动切下一码)</label>
-                <input type="number" id="zimaFormMax" class="form-input" value="200" min="1" max="500">
+                <label class="form-label">扫码阈值人数 (达到后自动切下一群)</label>
+                <input type="number" id="drawerZimaMaxNum" class="form-input" value="200" min="1" max="500">
               </div>
             </div>
             <div class="form-group">
               <label class="form-label">群主微信号 (可选，二维码失效备用)</label>
-              <input type="text" id="zimaFormLeader" class="form-input" placeholder="例如：sansure2016">
+              <input type="text" id="drawerZimaLeader" class="form-input" placeholder="例如：wxid_xxx">
             </div>
-            <button type="submit" class="btn btn-primary" style="width: 100%;">确认上传并加入轮换</button>
+            <button type="submit" class="btn btn-primary" style="width: 100%;">确认上传并加入轮换池</button>
           </form>
         </div>
       </div>
