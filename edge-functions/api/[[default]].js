@@ -54,7 +54,7 @@ export default async function onRequest(context) {
   // -------------------------------------------------------------
   // Direct Blob Static File Streaming (/api/blob/*)
   // -------------------------------------------------------------
-  if (path.startsWith("/blob/") && method === "GET") {
+  if (path.startsWith("/blob/") && path !== "/blob/list" && method === "GET") {
     const rawKey = path.replace(/^\/blob\//, "");
     const blobKey = decodeURIComponent(rawKey);
 

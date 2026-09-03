@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
   <title>EdgeLink 极连 | 智能短网址与微信群活码边缘系统</title>
-  <link rel="shortcut icon" href="./static/img/favicon.ico">
+  <link rel="shortcut icon" href="./static/img/logo-lt.png">
   <style>
     :root {
       --primary: #2563eb;
@@ -251,6 +251,54 @@
       color: #64748b;
       font-size: 14px;
     }
+
+    /* Mobile Responsiveness */
+    @media (max-width: 768px) {
+      .navbar {
+        padding: 14px 16px;
+      }
+      .brand span {
+        font-size: 16px;
+      }
+      .nav-links {
+        gap: 6px;
+      }
+      .nav-links .btn {
+        padding: 8px 12px;
+        font-size: 13px;
+      }
+      .hero {
+        padding: 30px 16px 50px;
+      }
+      .hero-title {
+        font-size: 32px;
+        line-height: 1.25;
+      }
+      .hero-desc {
+        font-size: 14px;
+        margin-bottom: 24px;
+      }
+      .hero-actions {
+        flex-direction: column;
+        width: 100%;
+        gap: 12px;
+      }
+      .hero-actions .btn {
+        width: 100%;
+        justify-content: center;
+      }
+      .features-section {
+        margin: 30px auto 60px;
+        padding: 0 16px;
+      }
+      .features-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+      .feature-card {
+        padding: 24px 20px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -260,7 +308,7 @@
   <!-- Header -->
   <nav class="navbar">
     <a href="/" class="brand">
-      <div class="brand-icon">⚡</div>
+      <img src="./static/img/logo-lt.png" alt="EdgeLink" style="height: 36px; object-fit: contain; margin-right: 8px;">
       <span>EdgeLink 极连</span>
     </a>
     <div class="nav-links">
