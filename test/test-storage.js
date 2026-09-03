@@ -72,25 +72,28 @@ async function runTests() {
   console.assert(session && session.username === "admin", "Session verification failed");
   console.log("✓ Session token generation and verification passed\n");
 
-  // 4. Test Short URL Logic
-  console.log("--- 4. Testing Short URL Business Logic ---");
-  const dwzKey = "testdwz";
+  // 4. Test Short URL Logic & 1-Click Generation
+  console.log("--- 4. Testing Short URL Business Logic & 1-Click Generation ---");
+  const randomKey = Math.random().toString(36).substring(2, 8);
+  const targetLongUrl = "https://cloud.tencent.com/document/product/1552/127420";
+  const autoTitle = `${new URL(targetLongUrl).hostname}_${randomKey}`;
   const dwzData = {
     id: Date.now(),
-    title: "测试短网址",
-    key: dwzKey,
-    url: "https://example.com/target",
+    title: autoTitle,
+    key: randomKey,
+    url: targetLongUrl,
     type: 1,
     status: 1,
     pv: 0,
     today_pv: { pv: 0, date: "2026-09-03" },
   };
-  await kv.putJSON(`dwz_key_${dwzKey}`, dwzData);
-  await kv.putJSON("dwz_index", [dwzKey]);
+  await kv.putJSON(`dwz_key_${randomKey}`, dwzData);
+  await kv.putJSON("dwz_index", [randomKey]);
 
-  const fetchedDwz = await kv.getJSON(`dwz_key_${dwzKey}`);
-  console.assert(fetchedDwz.url === "https://example.com/target", "Dwz fetch failed");
-  console.log("✓ Short URL creation and retrieval passed\n");
+  const fetchedDwz = await kv.getJSON(`dwz_key_${randomKey}`);
+  console.assert(fetchedDwz.url === targetLongUrl, "Dwz fetch failed");
+  console.assert(fetchedDwz.title.includes("cloud.tencent.com"), "Auto title generation failed");
+  console.log(`✓ 1-Click Short URL auto-generation passed: ${randomKey} -> ${fetchedDwz.url}`);
 
   // 5. Test Group Live Code Subcode Rotation Logic
   console.log("--- 5. Testing Group Live Code Threshold Rotation ---");

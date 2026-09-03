@@ -16,6 +16,7 @@ const STATE = {
 // Toast Notifications
 function showToast(message, type = "success") {
   const container = document.getElementById("toastContainer");
+  if (!container) return;
   const toast = document.createElement("div");
   toast.className = `toast toast-${type}`;
   const icon = type === "success" ? "✅" : type === "error" ? "❌" : "ℹ️";
@@ -25,11 +26,29 @@ function showToast(message, type = "success") {
     toast.style.opacity = "0";
     toast.style.transform = "translateX(40px)";
     setTimeout(() => toast.remove(), 300);
-  }, 3000);
+  }, 3500);
+}
+
+// Extract any EdgeOne preview parameters (eo_token, eo_time) to forward with API calls
+function getPreviewQueryParams() {
+  const currentParams = new URLSearchParams(window.location.search);
+  const forwardParams = new URLSearchParams();
+  for (const [k, v] of currentParams.entries()) {
+    if (k.startsWith("eo_") || k === "token" || k === "preview") {
+      forwardParams.set(k, v);
+    }
+  }
+  return forwardParams.toString();
 }
 
 // API Helper
 async function apiRequest(endpoint, method = "GET", body = null) {
+  const previewQuery = getPreviewQueryParams();
+  let fullUrl = endpoint;
+  if (previewQuery) {
+    fullUrl += (fullUrl.includes("?") ? "&" : "?") + previewQuery;
+  }
+
   const options = {
     method,
     headers: {},
@@ -50,14 +69,29 @@ async function apiRequest(endpoint, method = "GET", body = null) {
   }
 
   try {
-    const res = await fetch(endpoint, options);
-    const data = await res.json();
+    const res = await fetch(fullUrl, options);
+
+    // Detect if EdgeOne preview gateway blocked the request
+    const eoMsg = res.headers.get("X-EOP-MSG") || "";
+    if (eoMsg.includes("eo_time") || eoMsg.includes("token") || res.status === 401 && eoMsg) {
+      showToast("EdgeOne 预览保护生效中，请从控制台点击【预览】打开带签名链接，或在 EdgeOne 项目设置中关闭【预览保护】", "error");
+      return null;
+    }
+
     if (res.status === 401) {
       STATE.isLoggedIn = false;
       document.getElementById("authOverlay").style.display = "flex";
       return null;
     }
-    return data;
+
+    const contentType = res.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
+      const text = await res.text();
+      console.warn("Non-JSON response from API:", text.substring(0, 200));
+      return null;
+    }
+
+    return await res.json();
   } catch (err) {
     console.error(`API Error [${endpoint}]:`, err);
     showToast("网络请求异常: " + err.message, "error");
@@ -94,7 +128,7 @@ function switchTab(tabId) {
 function copyText(text) {
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(text).then(() => {
-      showToast("链接已复制到剪贴板");
+      showToast("链接已复制到剪贴板！");
     });
   } else {
     const input = document.createElement("input");
@@ -103,7 +137,7 @@ function copyText(text) {
     input.select();
     document.execCommand("copy");
     input.remove();
-    showToast("链接已复制到剪贴板");
+    showToast("链接已复制到剪贴板！");
   }
 }
 
@@ -111,6 +145,12 @@ function copyText(text) {
 // Auth Logic
 // -------------------------------------------------------------
 async function checkAuth() {
+  // Check if preview domain without eo_time
+  if (window.location.hostname.endsWith(".edgeone.dev") && !window.location.search.includes("eo_time")) {
+    const banner = document.getElementById("previewWarningBanner");
+    if (banner) banner.style.display = "block";
+  }
+
   const res = await apiRequest("/api/auth/check");
   if (res && res.data && res.data.loggedIn) {
     STATE.isLoggedIn = true;
@@ -134,9 +174,10 @@ async function handleLogin(e) {
     return;
   }
 
+  showToast("正在验证登录...", "info");
   const res = await apiRequest("/api/login", "POST", { username, password });
   if (res && res.code === 200) {
-    showToast("登录成功");
+    showToast("登录成功！");
     localStorage.setItem("dwz_token", res.data.token);
     STATE.isLoggedIn = true;
     STATE.username = res.data.username;
@@ -182,6 +223,62 @@ async function loadOverview() {
 }
 
 // -------------------------------------------------------------
+// ⚡ 1-Step Quick Short URL Generator (一键粘贴即生成)
+// -------------------------------------------------------------
+async function handleQuickGenerate(e, inputId = "quickUrlInput") {
+  if (e) e.preventDefault();
+  const inputEl = document.getElementById(inputId);
+  const longUrl = inputEl ? inputEl.value.trim() : "";
+
+  if (!longUrl) {
+    showToast("请粘贴或输入长链接", "error");
+    if (inputEl) inputEl.focus();
+    return;
+  }
+
+  showToast("⚡ 正在生成短网址...", "info");
+  const res = await apiRequest("/api/dwz/create", "POST", { url: longUrl });
+
+  if (res && res.code === 200) {
+    const shortUrl = res.data.shortUrl || `${window.location.origin}/s/${res.data.key}`;
+    inputEl.value = "";
+
+    // Automatically copy generated short link to clipboard
+    copyText(shortUrl);
+
+    // Pop up instant result modal with QR code
+    showGeneratedResultModal(res.data, shortUrl);
+
+    // Refresh lists
+    if (STATE.activeTab === "dwz") loadDwzList();
+    if (STATE.activeTab === "overview") loadOverview();
+  } else {
+    showToast(res?.msg || "生成短网址失败", "error");
+  }
+}
+
+function showGeneratedResultModal(item, shortUrl) {
+  document.getElementById("resultModalShortUrl").textContent = shortUrl;
+  document.getElementById("resultModalOriginalUrl").textContent = item.url;
+  document.getElementById("resultModalKey").textContent = item.key;
+
+  const qrContainer = document.getElementById("resultModalCanvas");
+  qrContainer.innerHTML = "";
+  if (typeof QRCode !== "undefined") {
+    new QRCode(qrContainer, {
+      text: shortUrl,
+      width: 180,
+      height: 180,
+      colorDark: "#000000",
+      colorLight: "#ffffff",
+      correctLevel: QRCode.CorrectLevel.H,
+    });
+  }
+
+  document.getElementById("generatedResultModal").classList.add("show");
+}
+
+// -------------------------------------------------------------
 // 短网址 (dwz)
 // -------------------------------------------------------------
 const DWZ_TYPE_MAP = {
@@ -206,7 +303,7 @@ function renderDwzTable(list) {
   tbody.innerHTML = "";
 
   if (!list || list.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="empty-icon">🔗</div><p>暂无短网址，点击右上角新建</p></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="empty-icon">🔗</div><p>暂无短网址，请在上方粘贴长链接一键生成</p></td></tr>`;
     return;
   }
 
@@ -273,7 +370,7 @@ function filterDwz() {
 }
 
 function openCreateDwzModal() {
-  document.getElementById("dwzModalTitle").textContent = "新建短网址";
+  document.getElementById("dwzModalTitle").textContent = "新建短网址 (高级设置)";
   document.getElementById("dwzFormKey").value = "";
   document.getElementById("dwzFormKeyInput").value = "";
   document.getElementById("dwzFormKeyInput").disabled = false;
@@ -726,7 +823,7 @@ function renderBlobGallery(list) {
   container.innerHTML = "";
 
   if (!list || list.length === 0) {
-    container.innerHTML = `<div class="empty-state" style="grid-column: 1/-1;"><div class="empty-icon">🖼️</div><p>暂无存储的素材图片，可通过下方上传</p></div>`;
+    container.innerHTML = `<div class="empty-state" style="grid-column: 1/-1;"><div class="empty-icon">🖼️</div><p>暂无存储的素材图片，系统首次上传会自动创建存储桶</p></div>`;
     return;
   }
 

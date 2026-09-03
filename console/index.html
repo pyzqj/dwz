@@ -2,11 +2,12 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
+  <base href="/console/">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
   <title>EdgeOne 智能控制台 | 短网址与群活码系统</title>
-  <link rel="shortcut icon" href="../static/img/favicon.ico">
-  <link rel="stylesheet" href="./style.css">
-  <script src="../static/js/qrcode.min.js"></script>
+  <link rel="shortcut icon" href="/static/img/favicon.ico">
+  <link rel="stylesheet" href="/console/style.css">
+  <script src="/static/js/qrcode.min.js"></script>
 </head>
 <body>
   <!-- Toast Container -->
@@ -18,6 +19,12 @@
       <div class="logo-badge">⚡</div>
       <h2>EdgeOne 智能控制台</h2>
       <p>短网址 & 群活码边缘调度管理系统</p>
+      
+      <!-- Preview Environment Notice -->
+      <div id="previewWarningBanner" style="display: none; background: #fffbeb; border: 1px solid #fef3c7; color: #b45309; padding: 12px; border-radius: 8px; font-size: 12px; margin-bottom: 16px; text-align: left; line-height: 1.5;">
+        ⚠️ <strong>提示</strong>：如遇 401 拦截，请从 EdgeOne 控制台点击【预览】打开带有效签名的链接，或在 EdgeOne 控制台项目设置中关闭【预览保护】/ 绑定自定义域名。
+      </div>
+
       <form id="loginForm" onsubmit="handleLogin(event)">
         <div class="form-group" style="text-align: left;">
           <label class="form-label">管理员账号</label>
@@ -96,6 +103,19 @@
         
         <!-- Tab 1: Overview Panel -->
         <section class="tab-pane active" id="tab-overview">
+          
+          <!-- ⚡ 1-Click Quick Short URL Generator -->
+          <div class="quick-generate-box">
+            <div class="quick-generate-title">
+              <span>⚡ 极速生成短网址</span>
+              <small style="font-size: 12px; color: #94a3b8; font-weight: normal;">（粘贴长链接，一键自动生成并复制短链）</small>
+            </div>
+            <form onsubmit="handleQuickGenerate(event, 'quickUrlInputOverview')" class="quick-generate-form">
+              <input type="url" id="quickUrlInputOverview" class="quick-generate-input" placeholder="输入或粘贴长链接 (例如 https://example.com/long/path/12345)..." required>
+              <button type="submit" class="btn btn-primary quick-generate-btn">⚡ 一键生成短网址</button>
+            </form>
+          </div>
+
           <div class="metrics-grid">
             <div class="metric-card">
               <div class="metric-info">
@@ -127,8 +147,8 @@
             <div class="metric-card">
               <div class="metric-info">
                 <h3>底层存储架构</h3>
-                <div class="metric-val" style="font-size: 20px; color: var(--primary);">EdgeOne</div>
-                <div class="metric-sub">KV 键值 + Blob 对象</div>
+                <div class="metric-val" style="font-size: 18px; color: var(--primary);">EdgeOne KV & Blob</div>
+                <div class="metric-sub">零服务器全球边缘部署</div>
               </div>
               <div class="metric-icon icon-orange">⚡</div>
             </div>
@@ -138,32 +158,44 @@
           <div class="card-table" style="padding: 24px; margin-bottom: 24px;">
             <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 12px;">快捷入口</h3>
             <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-              <button class="btn btn-primary" onclick="openCreateDwzModal()">+ 新建短网址</button>
+              <button class="btn btn-primary" onclick="openCreateDwzModal()">+ 高级新建短网址</button>
               <button class="btn btn-primary" onclick="openCreateQunModal()">+ 新建群活码</button>
               <button class="btn btn-secondary" onclick="switchTab('blob')">📁 管理 Blob 素材</button>
-              <a href="../" target="_blank" class="btn btn-secondary">🌐 访问系统首页</a>
+              <a href="/" target="_blank" class="btn btn-secondary">🌐 访问系统首页</a>
             </div>
           </div>
 
           <!-- System Architecture Info -->
           <div class="card-table" style="padding: 24px;">
-            <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 12px;">☁️ 腾讯云 EdgeOne 部署指南</h3>
+            <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 12px;">☁️ 腾讯云 EdgeOne 运行状态</h3>
             <p style="font-size: 14px; color: var(--text-muted); line-height: 1.8;">
-              本系统专为 <strong>腾讯云 EdgeOne Pages (Makers)</strong> 原生定制：<br>
-              1. <strong>KV 数据库</strong>：所有短链映射、活码配置与访问量均存储在 EdgeOne KV 中，全球 60s 内自动分发同步。<br>
-              2. <strong>Blob 文件存储</strong>：所有上传的微信群二维码均保存在 EdgeOne Blob 中，通过 <code>/api/blob/*</code> 全球 CDN 毫秒级加速回显。<br>
-              3. <strong>设备分流与防封</strong>：支持微信客户端专属引导、移动端专属分流、多群子码自动阈值切换及去重机制。
+              1. <strong>KV 数据库</strong>：短链配置、活码与访问量实时存储于腾讯云 EdgeOne KV，边缘节点毫秒级查询。<br>
+              2. <strong>Blob 文件存储</strong>：无需手动配置，首次上传文件时系统通过 SDK 自动创建 Blob 存储桶，并通过 <code>/api/blob/*</code> 全球 CDN 加速分发。<br>
+              3. <strong>设备分流与防封</strong>：支持微信内环境专跳、移动浏览器防拦截引导、多群子码自动阈值轮换与 7 天去重机制。
             </p>
           </div>
         </section>
 
         <!-- Tab 2: Short URL Management -->
         <section class="tab-pane" id="tab-dwz">
+          
+          <!-- ⚡ 1-Click Quick Short URL Generator -->
+          <div class="quick-generate-box">
+            <div class="quick-generate-title">
+              <span>⚡ 极速生成短网址</span>
+              <small style="font-size: 12px; color: #94a3b8; font-weight: normal;">（直接粘贴长链接，一键生成短链并自动复制）</small>
+            </div>
+            <form onsubmit="handleQuickGenerate(event, 'quickUrlInputDwz')" class="quick-generate-form">
+              <input type="url" id="quickUrlInputDwz" class="quick-generate-input" placeholder="输入或粘贴长链接 (例如 https://example.com/item/12345)..." required>
+              <button type="submit" class="btn btn-primary quick-generate-btn">⚡ 一键生成短网址</button>
+            </form>
+          </div>
+
           <div class="section-header">
             <div class="search-bar">
               <input type="text" id="dwzSearchInput" class="search-input" placeholder="搜索短网址标题、Key 或目标链接..." oninput="filterDwz()">
             </div>
-            <button class="btn btn-primary" onclick="openCreateDwzModal()">+ 新建短网址</button>
+            <button class="btn btn-secondary" onclick="openCreateDwzModal()">⚙️ 高级配置新建</button>
           </div>
 
           <div class="card-table">
@@ -221,7 +253,7 @@
         <!-- Tab 4: Blob Materials Library -->
         <section class="tab-pane" id="tab-blob">
           <div class="section-header">
-            <h3 class="section-title">🖼️ 已上传素材 (EdgeOne Blob)</h3>
+            <h3 class="section-title">🖼️ 已上传素材 (EdgeOne Blob 自动托管)</h3>
             <label class="btn btn-primary" style="cursor: pointer;">
               <span>+ 上传新图片到 Blob</span>
               <input type="file" accept="image/*" multiple style="display: none;" onchange="handleBlobUpload(event)">
@@ -259,7 +291,37 @@
     </main>
   </div>
 
-  <!-- Modal: Create/Edit Short URL -->
+  <!-- Modal: Instant Short URL Generated Result -->
+  <div class="modal-backdrop" id="generatedResultModal">
+    <div class="modal-card" style="max-width: 440px; text-align: center;">
+      <div class="modal-header">
+        <h3 style="color: #16a34a; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;">
+          <span>🎉</span> <span>短网址生成成功！</span>
+        </h3>
+        <button class="modal-close" onclick="closeModal('generatedResultModal')">&times;</button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; align-items: center;">
+        <div class="result-box" style="width: 100%;">
+          <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">生成的短网址链接 (已自动复制到剪贴板)：</div>
+          <div class="result-url" id="resultModalShortUrl"></div>
+          <div style="font-size: 11px; color: var(--text-muted); word-break: break-all; margin-top: 4px;">
+            目标链接: <span id="resultModalOriginalUrl"></span>
+          </div>
+          <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+            短链 Key: <code id="resultModalKey" style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px;"></code>
+          </div>
+        </div>
+
+        <div id="resultModalCanvas" style="margin: 8px auto; padding: 10px; background: #fff; border-radius: 12px; border: 1px solid #e2e8f0;"></div>
+      </div>
+      <div class="modal-footer" style="justify-content: center; gap: 12px;">
+        <button type="button" class="btn btn-primary" onclick="copyText(document.getElementById('resultModalShortUrl').textContent)">📋 再次复制链接</button>
+        <button type="button" class="btn btn-secondary" onclick="closeModal('generatedResultModal')">完成</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Create/Edit Short URL (Advanced) -->
   <div class="modal-backdrop" id="dwzModal">
     <div class="modal-card">
       <div class="modal-header">
@@ -272,7 +334,7 @@
           
           <div class="form-group">
             <label class="form-label">短网址标题</label>
-            <input type="text" id="dwzFormTitle" class="form-input" placeholder="例如：官网推广链接" required>
+            <input type="text" id="dwzFormTitle" class="form-input" placeholder="留空系统将自动提取域名作为标题">
           </div>
 
           <div class="form-group">
@@ -281,7 +343,7 @@
           </div>
 
           <div class="form-group">
-            <label class="form-label">短链 Key <small>留空系统将随机生成6位字符</small></label>
+            <label class="form-label">自定义短链 Key <small>留空系统将随机生成6位字符</small></label>
             <input type="text" id="dwzFormKeyInput" class="form-input" placeholder="例如：vip2026">
           </div>
 
@@ -388,7 +450,7 @@
 
         <!-- Add New Subcode Form -->
         <div style="margin-top: 24px; padding-top: 20px; border-top: 1px dashed var(--border-color);">
-          <h4 style="font-size: 15px; font-weight: 700; margin-bottom: 14px;">+ 上传添加新微信群二维码 (直接存入 EdgeOne Blob)</h4>
+          <h4 style="font-size: 15px; font-weight: 700; margin-bottom: 14px;">+ 上传添加新微信群二维码 (自动存入 EdgeOne Blob)</h4>
           <form id="addZimaForm" onsubmit="handleAddZima(event)">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 14px;">
               <div class="form-group" style="margin-bottom: 0;">
@@ -447,6 +509,6 @@
     </div>
   </div>
 
-  <script src="./app.js"></script>
+  <script src="/console/app.js"></script>
 </body>
 </html>
