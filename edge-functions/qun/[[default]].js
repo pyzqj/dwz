@@ -270,7 +270,7 @@ function renderQunPage(qunItem, activeZima, isKfFallback = false, cookieHeaderTo
     }
   </div>
 
-  <div class="footer-tip">由 EdgeOne 高速边缘云节点强力驱动</div>
+  <div class="footer-tip">EdgeLink 安全链接已就绪</div>
 </body>
 </html>`;
 

@@ -1,14 +1,14 @@
 /**
- * Tencent Cloud EdgeOne Full REST API Handler
+ * EdgeLink Full REST API Handler
  * Handles:
  * 1. Auth & Session (Web Crypto SHA-256) & API Key
  * 2. System Overview Stats
  * 3. Short URLs (dwz) CRUD & Open API (JSON & text formats)
  * 4. Group Live Codes (qun) CRUD & Subcodes (zima) Management
- * 5. Blob Materials Upload, Discovery (across all stores), and Management
+ * 5. Blob Materials Upload, Discovery, and Direct File Streaming (/api/blob/*)
  */
 
-import { getKV, getBlob, getAllBlobs } from "../../utils/storage.js";
+import { getKV, getBlob, getAllBlobs, getBlobData } from "../utils/storage.js";
 import {
   jsonResponse,
   getRandomKey,
@@ -18,7 +18,20 @@ import {
   authenticate,
   createSession,
   verifySession,
-} from "../../utils/auth.js";
+} from "../utils/auth.js";
+
+const MIME_TYPES = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  svg: "image/svg+xml",
+  webp: "image/webp",
+  ico: "image/x-icon",
+  txt: "text/plain; charset=utf-8",
+  json: "application/json; charset=utf-8",
+  pdf: "application/pdf",
+};
 
 export default async function onRequest(context) {
   const { request } = context;
@@ -36,6 +49,40 @@ export default async function onRequest(context) {
         "Access-Control-Allow-Headers": "Content-Type, Authorization, X-API-Key, X-Requested-With",
       },
     });
+  }
+
+  // -------------------------------------------------------------
+  // Direct Blob Static File Streaming (/api/blob/*)
+  // -------------------------------------------------------------
+  if (path.startsWith("/blob/") && method === "GET") {
+    const rawKey = path.replace(/^\/blob\//, "");
+    const blobKey = decodeURIComponent(rawKey);
+
+    if (!blobKey) {
+      return new Response("Missing file key", { status: 400 });
+    }
+
+    try {
+      const data = await getBlobData(blobKey);
+      if (!data) {
+        return new Response("File not found in storage", { status: 404 });
+      }
+
+      const dotIdx = blobKey.lastIndexOf(".");
+      const ext = dotIdx !== -1 ? blobKey.substring(dotIdx + 1).toLowerCase() : "";
+      const contentType = MIME_TYPES[ext] || "image/jpeg";
+
+      return new Response(data, {
+        status: 200,
+        headers: {
+          "Content-Type": contentType,
+          "Cache-Control": "public, max-age=31536000, immutable",
+          "Access-Control-Allow-Origin": "*",
+        },
+      });
+    } catch (err) {
+      return new Response("Blob Read Error: " + err.message, { status: 500 });
+    }
   }
 
   const kv = getKV(context);
@@ -142,7 +189,6 @@ export default async function onRequest(context) {
         return jsonResponse({ code: 400, msg: "JSON 请求体格式错误" }, 400);
       }
     } else {
-      // GET Query Parameters
       targetUrl = url.searchParams.get("url");
       title = url.searchParams.get("title");
       key = url.searchParams.get("key");
@@ -168,7 +214,6 @@ export default async function onRequest(context) {
       }
     }
 
-    // Check if key already exists
     const existing = await kv.getJSON(`dwz_key_${key}`);
     if (existing) {
       return jsonResponse({ code: 400, msg: `短链 Key [${key}] 已被占用，请更换` }, 400);
@@ -202,7 +247,6 @@ export default async function onRequest(context) {
 
     await kv.putJSON(`dwz_key_${key}`, dwzItem);
 
-    // Update index
     const dwzIndex = (await kv.getJSON("dwz_index")) || [];
     if (!dwzIndex.includes(key)) {
       dwzIndex.unshift(key);
@@ -211,7 +255,6 @@ export default async function onRequest(context) {
 
     const shortUrl = `${url.origin}/s/${key}`;
 
-    // If text format requested (convenient for curl/scripts/Shortcuts)
     if (format === "text") {
       return new Response(shortUrl, {
         status: 200,
@@ -416,7 +459,7 @@ export default async function onRequest(context) {
   }
 
   // -------------------------------------------------------------
-  // 群活码 (qun) Management Routes (Rewritten Clean Logic)
+  // 群活码 (qun) Management Routes
   // -------------------------------------------------------------
   if (path === "/qun/list" && method === "GET") {
     const qunIndex = (await kv.getJSON("qun_index")) || [];
@@ -477,7 +520,6 @@ export default async function onRequest(context) {
 
     const qid = String(Date.now()).substring(3);
 
-    // Process initial subcodes
     const formattedZima = [];
     if (Array.isArray(zima)) {
       zima.forEach((zm, index) => {
@@ -703,7 +745,6 @@ export default async function onRequest(context) {
 
   if (path === "/blob/list" && method === "GET") {
     try {
-      // Discovers all blobs across all stores (without prefix filters)
       const blobs = await getAllBlobs();
       return jsonResponse({
         code: 200,

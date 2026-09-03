@@ -170,11 +170,13 @@ async function checkAuth() {
     STATE.isLoggedIn = true;
     STATE.username = res.data.username || "admin";
     document.getElementById("authOverlay").style.display = "none";
+    document.getElementById("appContainer").style.display = "flex";
     document.getElementById("headerUsername").textContent = STATE.username;
     loadOverview();
   } else {
     STATE.isLoggedIn = false;
     document.getElementById("authOverlay").style.display = "flex";
+    document.getElementById("appContainer").style.display = "none";
   }
 }
 
@@ -196,6 +198,7 @@ async function handleLogin(e) {
     STATE.isLoggedIn = true;
     STATE.username = res.data.username;
     document.getElementById("authOverlay").style.display = "none";
+    document.getElementById("appContainer").style.display = "flex";
     document.getElementById("headerUsername").textContent = STATE.username;
     loadOverview();
   } else {
@@ -209,6 +212,8 @@ async function handleLogout() {
   localStorage.removeItem("dwz_token");
   STATE.isLoggedIn = false;
   document.getElementById("authOverlay").style.display = "flex";
+  document.getElementById("appContainer").style.display = "none";
+  showToast("已安全退出登录");
 }
 
 // -------------------------------------------------------------
@@ -229,7 +234,7 @@ async function loadOverview() {
     if (d.isMock) {
       runtimeBadge.textContent = "🟡 本地开发模式 (Mock 存储)";
     } else {
-      runtimeBadge.textContent = "🟢 EdgeOne 边缘在线";
+      runtimeBadge.textContent = "🟢 边缘节点在线";
     }
   }
 }
@@ -675,7 +680,7 @@ async function handleBatchAddGroupImages(e) {
   const files = e.target.files;
   if (!files || files.length === 0) return;
 
-  showToast(`正在自动上传 ${files.length} 张群二维码至 EdgeOne Blob...`, "info");
+  showToast(`正在自动上传 ${files.length} 张群二维码至云存储...`, "info");
   for (let i = 0; i < files.length; i++) {
     const url = await uploadFileToBlob(files[i]);
     if (url) {
@@ -873,7 +878,7 @@ async function handleAddZimaInDrawer(e) {
     return;
   }
 
-  showToast("正在上传群二维码至 EdgeOne Blob...", "info");
+  showToast("正在上传群二维码至云存储...", "info");
   const qrcodeUrl = await uploadFileToBlob(fileInput.files[0]);
   if (!qrcodeUrl) return;
 
@@ -999,7 +1004,7 @@ async function handleBlobUpload(e) {
   const files = e.target.files;
   if (!files || files.length === 0) return;
 
-  showToast(`正在上传 ${files.length} 个文件至 EdgeOne Blob...`, "info");
+  showToast(`正在上传 ${files.length} 个文件至云存储...`, "info");
   for (let i = 0; i < files.length; i++) {
     await uploadFileToBlob(files[i]);
   }
@@ -1009,7 +1014,7 @@ async function handleBlobUpload(e) {
 }
 
 async function deleteBlobItem(key) {
-  if (!confirm(`确定要从 EdgeOne Blob 中删除文件 [${key}] 吗？`)) return;
+  if (!confirm(`确定要从存储中删除文件 [${key}] 吗？`)) return;
   const res = await apiRequest("/api/blob/delete", "POST", { key });
   if (res && res.code === 200) {
     showToast("素材删除成功");

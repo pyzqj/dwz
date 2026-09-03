@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <base href="/console/">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
-  <title>EdgeLink 极连 | 智能短网址与群活码边缘系统</title>
+  <title>EdgeLink | 智能短网址与群活码管理系统</title>
   <link rel="shortcut icon" href="/static/img/favicon.ico">
   <link rel="stylesheet" href="/console/style.css">
   <script src="/static/js/qrcode.min.js"></script>
@@ -16,35 +16,36 @@
   <!-- Mobile Sidebar Overlay -->
   <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeMobileMenu()"></div>
 
-  <!-- Login Overlay -->
-  <div class="auth-overlay" id="authOverlay" style="display: none;">
+  <!-- Login Overlay (Visible by default to prevent dashboard flash) -->
+  <div class="auth-overlay" id="authOverlay" style="display: flex;">
     <div class="auth-card">
       <div class="logo-badge">⚡</div>
-      <h2>EdgeLink 极连控制台</h2>
-      <p>短网址 & 群活码边缘分布式调度系统</p>
+      <h2>EdgeLink 控制台</h2>
+      <p>智能短网址 & 微信群活码调度系统</p>
       
       <form id="loginForm" onsubmit="handleLogin(event)">
         <div class="form-group" style="text-align: left;">
           <label class="form-label">管理员账号</label>
-          <input type="text" id="loginUsername" class="form-input" placeholder="默认 admin" value="admin" required>
+          <input type="text" id="loginUsername" class="form-input" placeholder="默认 admin" value="admin" required autofocus>
         </div>
         <div class="form-group" style="text-align: left;">
           <label class="form-label">管理员密码</label>
           <input type="password" id="loginPassword" class="form-input" placeholder="默认 admin123" required>
         </div>
-        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; margin-top: 10px;">立即登录控制台</button>
+        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; margin-top: 10px; font-size: 15px;">立即登录控制台</button>
       </form>
     </div>
   </div>
 
-  <div class="app-container">
+  <!-- Main App Container (Hidden by default until authenticated) -->
+  <div class="app-container" id="appContainer" style="display: none;">
     <!-- Sidebar Navigation -->
     <aside class="sidebar">
       <div class="sidebar-header">
         <div class="logo-badge">⚡</div>
         <div class="logo-text">
-          <h1>EdgeLink 极连</h1>
-          <p>EdgeOne 原生边缘架构</p>
+          <h1>EdgeLink</h1>
+          <p>分布式边缘架构</p>
         </div>
       </div>
 
@@ -63,21 +64,25 @@
         </button>
         <button class="nav-item" data-tab="blob" onclick="switchTab('blob')">
           <span class="icon">🖼️</span>
-          <span>Blob 素材库</span>
+          <span>素材库</span>
         </button>
         <button class="nav-item" data-tab="api" onclick="switchTab('api')">
           <span class="icon">⚡</span>
-          <span>开放 API 文档</span>
+          <span>开放 API</span>
         </button>
         <button class="nav-item" data-tab="settings" onclick="switchTab('settings')">
           <span class="icon">⚙️</span>
           <span>系统设置</span>
         </button>
+        <button class="nav-item" onclick="handleLogout()" style="color: #f87171; margin-top: 20px;">
+          <span class="icon">🚪</span>
+          <span>退出登录</span>
+        </button>
       </nav>
 
       <div class="sidebar-footer">
-        <span>EdgeLink v3.2</span>
-        <button onclick="handleLogout()" style="background: none; border: none; color: #94a3b8; cursor: pointer;" title="退出登录">🚪 退出</button>
+        <span>EdgeLink v3.3</span>
+        <button onclick="handleLogout()" style="background: none; border: none; color: #f87171; cursor: pointer; font-weight: 600;" title="退出登录">🚪 退出</button>
       </div>
     </aside>
 
@@ -92,12 +97,16 @@
         <div class="header-right">
           <div class="status-pill">
             <span class="status-dot"></span>
-            <span id="runtimeStatusBadge">EdgeOne 边缘在线</span>
+            <span id="runtimeStatusBadge">边缘节点在线</span>
           </div>
           <div class="user-badge">
             <span>👤</span>
             <span id="headerUsername">admin</span>
           </div>
+          <!-- Clear Prominent Logout Button -->
+          <button class="btn btn-secondary btn-sm" onclick="handleLogout()" style="color: var(--danger); border-color: #fecaca; background: #fff5f5; font-weight: 600;" title="退出当前登录">
+            🚪 退出登录
+          </button>
         </div>
       </header>
 
@@ -149,9 +158,9 @@
 
             <div class="metric-card">
               <div class="metric-info">
-                <h3>底层存储架构</h3>
-                <div class="metric-val" style="font-size: 18px; color: var(--primary);">EdgeOne KV & Blob</div>
-                <div class="metric-sub">零服务器全球边缘部署</div>
+                <h3>系统运行状态</h3>
+                <div class="metric-val" style="font-size: 18px; color: var(--success);">全球边缘就绪</div>
+                <div class="metric-sub">分布式 KV & Blob 存储</div>
               </div>
               <div class="metric-icon icon-orange">⚡</div>
             </div>
@@ -163,7 +172,7 @@
             <div style="display: flex; gap: 12px; flex-wrap: wrap;">
               <button class="btn btn-primary" onclick="openCreateDwzModal()">+ 高级新建短网址</button>
               <button class="btn btn-primary" onclick="openCreateQunModal()">+ 新建群活码</button>
-              <button class="btn btn-secondary" onclick="switchTab('blob')">📁 管理 Blob 素材</button>
+              <button class="btn btn-secondary" onclick="switchTab('blob')">📁 管理素材库</button>
               <button class="btn btn-secondary" onclick="switchTab('api')">⚡ 查看开放 API</button>
               <a href="/" target="_blank" class="btn btn-secondary">🌐 访问系统首页</a>
             </div>
@@ -171,11 +180,11 @@
 
           <!-- System Architecture Info -->
           <div class="card-table" style="padding: 24px;">
-            <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 12px;">☁️ EdgeLink 边缘无服务架构已就绪</h3>
+            <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 12px;">✨ 系统特性与运行说明</h3>
             <p style="font-size: 14px; color: var(--text-muted); line-height: 1.8;">
-              1. <strong>高可用短网址</strong>：支持一键秒级生成、微信内置专跳、仅手机浏览器防拦截以及 iOS / Android 设备精准分流。<br>
-              2. <strong>智能群活码</strong>：群满自动平滑切换至下一个群二维码，配备 7 天防重复进群去重与微信官方安全认证绿标，群全满时客服微信自动兜底。<br>
-              3. <strong>原生 KV & Blob 存储</strong>：所有数据持久化在腾讯云 EdgeOne KV，图片自动托管于 EdgeOne Blob 全球 CDN 毫秒级回显。
+              1. <strong>高可用短网址</strong>：支持一键秒级生成、微信内环境专跳、手机浏览器防拦截以及 iOS / Android 设备精准分流。<br>
+              2. <strong>智能微信群活码</strong>：群满自动平滑切换至下一个群二维码，配备 7 天防重复进群去重与微信官方安全绿标，群全满时客服微信自动兜底。<br>
+              3. <strong>分布式存储架构</strong>：所有短链映射、活码配置与访问量均由分布式 KV 数据库托管，图片素材通过全球 CDN 毫秒级分发加速。
             </p>
           </div>
         </section>
@@ -261,17 +270,17 @@
         <section class="tab-pane" id="tab-blob">
           <div class="section-header">
             <div>
-              <h3 class="section-title">🖼️ 已上传素材 (EdgeOne Blob 自动全盘托管)</h3>
-              <p style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">展示 EdgeOne 控制台及系统所有已存储的图片对象，点击可快速复制直链</p>
+              <h3 class="section-title">🖼️ 已上传素材 (云存储全盘托管)</h3>
+              <p style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">展示存储桶中所有已上传的图片对象，点击可快速复制直链</p>
             </div>
             <label class="btn btn-primary" style="cursor: pointer;">
-              <span>+ 上传新图片到 Blob</span>
+              <span>+ 上传新图片</span>
               <input type="file" accept="image/*" multiple style="display: none;" onchange="handleBlobUpload(event)">
             </label>
           </div>
 
           <div id="blobGalleryContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px;">
-            <div class="empty-state" style="grid-column: 1/-1;"><p>正在读取 Blob 存储桶...</p></div>
+            <div class="empty-state" style="grid-column: 1/-1;"><p>正在读取素材库...</p></div>
           </div>
         </section>
 
@@ -541,7 +550,7 @@
 
         <!-- Add New Subcode Form -->
         <div style="margin-top: 24px; padding-top: 20px; border-top: 1px dashed var(--border-color);">
-          <h4 style="font-size: 15px; font-weight: 700; margin-bottom: 14px;">+ 追加新微信群二维码 (直接存入 EdgeOne Blob)</h4>
+          <h4 style="font-size: 15px; font-weight: 700; margin-bottom: 14px;">+ 追加新微信群二维码 (直接存入云存储)</h4>
           <form id="addZimaFormDrawer" onsubmit="handleAddZimaInDrawer(event)">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 14px;">
               <div class="form-group" style="margin-bottom: 0;">

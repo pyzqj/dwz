@@ -113,7 +113,26 @@ export function jsonResponse(data, status = 200) {
       "Content-Type": "application/json; charset=utf-8",
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, X-API-Key",
     },
   });
+}
+
+/**
+ * Generate random key
+ */
+export function getRandomKey(length = 6) {
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let res = "";
+  for (let i = 0; i < length; i++) {
+    res += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return res;
+}
+
+/**
+ * Get YYYY-MM-DD date string
+ */
+export function getTodayString() {
+  return new Date().toISOString().split("T")[0];
 }
