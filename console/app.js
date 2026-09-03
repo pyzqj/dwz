@@ -302,7 +302,7 @@ async function handleQuickGenerate(e, inputId = "quickUrlInput") {
   const res = await apiRequest("/api/dwz/create", "POST", { url: longUrl });
 
   if (res && res.code === 200) {
-    const shortUrl = res.data.shortUrl || `${window.location.origin}/s/${res.data.key}`;
+    const shortUrl = res.data.shortUrl || `${window.location.origin}/${res.data.key}`;
     inputEl.value = "";
 
     // Automatically copy generated short link to clipboard
@@ -362,19 +362,26 @@ async function loadDwzList() {
 
 function renderDwzTable(list) {
   const tbody = document.getElementById("dwzTableBody");
+  const mobileContainer = document.getElementById("dwzMobileCardsContainer");
   tbody.innerHTML = "";
+  if (mobileContainer) mobileContainer.innerHTML = "";
 
   if (!list || list.length === 0) {
     tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="empty-icon">🔗</div><p>暂无短网址，直接在上方输入框粘贴长链接即可生成</p></td></tr>`;
+    if (mobileContainer) {
+      mobileContainer.innerHTML = `<div class="empty-state" style="padding: 24px; background: #fff; border-radius: 12px; border: 1px solid var(--border-color);"><p>暂无短网址，直接在上方输入框粘贴长链接即可生成</p></div>`;
+    }
     return;
   }
 
   const origin = window.location.origin;
 
   list.forEach((item) => {
-    const fullShortUrl = `${origin}/s/${item.key}`;
+    // Root-level short URL (e.g. https://d.pyz.me/37v)
+    const fullShortUrl = `${origin}/${item.key}`;
     const typeInfo = DWZ_TYPE_MAP[item.type] || { text: "通用跳转", class: "badge-primary" };
 
+    // 1. Desktop Table Row
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td style="min-width: 170px;">
@@ -413,6 +420,50 @@ function renderDwzTable(list) {
       </td>
     `;
     tbody.appendChild(tr);
+
+    // 2. Mobile Card (Clean vertical layout, no horizontal scroll needed)
+    if (mobileContainer) {
+      const card = document.createElement("div");
+      card.className = "mobile-data-card";
+      card.innerHTML = `
+        <div class="mobile-card-header">
+          <div>
+            <div class="mobile-card-title">${item.title || "短网址"}</div>
+            <div class="mobile-card-date">${item.created_at || ""}</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="badge ${typeInfo.class}">${typeInfo.text}</span>
+            <label class="switch" style="transform: scale(0.85);">
+              <input type="checkbox" ${item.status === 1 ? "checked" : ""} onchange="toggleDwzStatus('${item.key}')">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="mobile-short-url-box">
+          <a href="${fullShortUrl}" target="_blank" class="mobile-short-url-link">${fullShortUrl}</a>
+          <button class="btn btn-secondary btn-sm" onclick="copyText('${fullShortUrl}')" style="padding: 4px 10px; font-size: 12px;">📋 复制</button>
+        </div>
+
+        <div class="mobile-target-url-text" title="${item.url}">
+          目标: <a href="${item.url}" target="_blank" style="color: var(--primary); text-decoration: underline;">${item.url}</a>
+        </div>
+
+        <div class="mobile-card-stats">
+          <span>总访问: <strong style="color: var(--text-main);">${item.pv || 0}</strong> 次</span>
+          <span>今日: <strong style="color: var(--primary);">${item.today_pv_count || 0}</strong> 次</span>
+          <span>${item.status === 1 ? '<span style="color: var(--success); font-weight: 600;">● 启用中</span>' : '<span style="color: var(--danger); font-weight: 600;">● 已暂停</span>'}</span>
+        </div>
+
+        <div class="mobile-card-actions">
+          <button class="btn btn-secondary btn-sm" onclick="showQrModal('${fullShortUrl}', '${item.title}')">📱 码</button>
+          <button class="btn btn-secondary btn-sm" onclick="openEditDwzModal('${item.key}')">✏️ 改</button>
+          <button class="btn btn-secondary btn-sm" onclick="resetDwzPv('${item.key}')">🔄 清</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteDwz('${item.key}')">🗑️ 删</button>
+        </div>
+      `;
+      mobileContainer.appendChild(card);
+    }
   });
 }
 
@@ -562,10 +613,15 @@ async function loadQunList() {
 
 function renderQunTable(list) {
   const tbody = document.getElementById("qunTableBody");
+  const mobileContainer = document.getElementById("qunMobileCardsContainer");
   tbody.innerHTML = "";
+  if (mobileContainer) mobileContainer.innerHTML = "";
 
   if (!list || list.length === 0) {
     tbody.innerHTML = `<tr><td colspan="6" class="empty-state"><div class="empty-icon">👥</div><p>暂无群活码，点击右上角【+ 新建群活码】一步完成配置</p></td></tr>`;
+    if (mobileContainer) {
+      mobileContainer.innerHTML = `<div class="empty-state" style="padding: 24px; background: #fff; border-radius: 12px; border: 1px solid var(--border-color);"><p>暂无群活码，点击右上角【+ 新建群活码】一步完成配置</p></div>`;
+    }
     return;
   }
 
@@ -590,6 +646,7 @@ function renderQunTable(list) {
       subcodeStatusHtml = `<span class="badge badge-warning">所有群码已满员</span>`;
     }
 
+    // 1. Desktop Table Row
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td style="min-width: 170px;">
@@ -630,6 +687,53 @@ function renderQunTable(list) {
       </td>
     `;
     tbody.appendChild(tr);
+
+    // 2. Mobile Card (Clean vertical layout, no horizontal scroll needed)
+    if (mobileContainer) {
+      const card = document.createElement("div");
+      card.className = "mobile-data-card";
+      card.innerHTML = `
+        <div class="mobile-card-header">
+          <div>
+            <div class="mobile-card-title">${item.title || "微信群活码"}</div>
+            <div class="mobile-card-date">ID: ${item.id} &bull; ${item.created_at || ""}</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label class="switch" style="transform: scale(0.85);">
+              <input type="checkbox" ${item.status === 1 ? "checked" : ""} onchange="toggleQunStatus('${item.id}')">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="mobile-short-url-box">
+          <a href="${fullQunUrl}" target="_blank" class="mobile-short-url-link">${fullQunUrl}</a>
+          <button class="btn btn-primary btn-sm" onclick="copyText('${fullQunUrl}')" style="padding: 4px 10px; font-size: 12px;">📋 复制</button>
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+          ${subcodeStatusHtml}
+          ${item.safety === 1 ? '<span class="badge badge-success" style="font-size: 11px;">🛡️ 微信安全绿标</span>' : ''}
+          ${item.qc === 1 ? '<span class="badge badge-primary" style="font-size: 11px;">🔄 7天去重</span>' : ''}
+        </div>
+
+        <div class="mobile-card-stats">
+          <span>累计进客: <strong style="color: var(--text-main);">${item.pv || 0}</strong> 人</span>
+          <span>今日: <strong style="color: var(--primary);">${item.today_pv_count || 0}</strong> 人</span>
+          <button class="btn btn-secondary btn-sm" onclick="openZimaDrawer('${item.id}')" style="padding: 3px 8px; font-size: 11px;">
+            ⚙️ 管理 ${zimaCount} 个子码
+          </button>
+        </div>
+
+        <div class="mobile-card-actions">
+          <button class="btn btn-secondary btn-sm" onclick="showQrModal('${fullQunUrl}', '${item.title}')">📱 码</button>
+          <button class="btn btn-secondary btn-sm" onclick="openPhoneSimulator('${fullQunUrl}')">📱 模拟器</button>
+          <button class="btn btn-secondary btn-sm" onclick="openEditQunModal('${item.id}')">✏️ 改</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteQun('${item.id}')">🗑️ 删</button>
+        </div>
+      `;
+      mobileContainer.appendChild(card);
+    }
   });
 }
 
@@ -939,42 +1043,51 @@ function renderExistingZimaList(zimaList) {
     const percent = Math.min(100, Math.round((pv / max) * 100));
     const isFull = pv >= max;
 
-    const itemDiv = document.createElement("div");
-    itemDiv.style.cssText = `
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      padding: 14px;
-      background: #ffffff;
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-md);
-      margin-bottom: 12px;
-    `;
-
-    itemDiv.innerHTML = `
-      <div style="width: 64px; height: 64px; border-radius: 8px; overflow: hidden; background: #fff; border: 1px solid #e2e8f0; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-        <img src="${zm.qrcode}" style="max-width: 100%; max-height: 100%; object-fit: contain;">
-      </div>
-      <div style="flex: 1;">
-        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-          <strong>第 ${index + 1} 顺位群码</strong>
+    const card = document.createElement("div");
+    card.className = "zima-subcode-card";
+    card.innerHTML = `
+      <div class="zima-card-top-row">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <strong style="font-size: 14px;">第 ${index + 1} 顺位群码</strong>
           ${isFull ? '<span class="badge badge-danger">已满员</span>' : '<span class="badge badge-success">进客中</span>'}
           ${zm.status !== 1 ? '<span class="badge badge-secondary">已暂停</span>' : ""}
         </div>
-        <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">
-          阈值上限: ${max} 人 | 已进客: ${pv} 人 | 群主微信: ${zm.leader || "未填写"}
-        </div>
-        <div style="width: 100%; background: #e2e8f0; height: 6px; border-radius: 3px; overflow: hidden;">
-          <div style="width: ${percent}%; height: 100%; background: ${isFull ? "var(--danger)" : "var(--primary)"}; border-radius: 3px;"></div>
+        <div style="font-size: 12px; color: var(--text-muted);">
+          群主微信: <strong style="color: var(--text-main);">${zm.leader || "未设置"}</strong>
         </div>
       </div>
-      <div style="display: flex; flex-direction: column; gap: 6px;">
-        <button class="btn btn-secondary btn-sm" onclick="toggleZimaStatus('${zm.id}')">${zm.status === 1 ? "暂停" : "启用"}</button>
-        <button class="btn btn-secondary btn-sm" onclick="resetZimaPv('${zm.id}')" title="清零该码访问量">🔄 清零</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteZima('${zm.id}')">删除</button>
+
+      <div class="zima-card-main-content">
+        <div class="zima-card-qr-thumb">
+          <img src="${zm.qrcode}" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+        </div>
+        <div style="flex: 1; min-width: 0;">
+          <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+            <span>进群进度 (${pv}/${max} 人)</span>
+            <span style="font-weight: 700; color: ${isFull ? 'var(--danger)' : 'var(--primary)'};">${percent}%</span>
+          </div>
+          <div style="width: 100%; background: #e2e8f0; height: 8px; border-radius: 4px; overflow: hidden; margin-bottom: 6px;">
+            <div style="width: ${percent}%; height: 100%; background: ${isFull ? "var(--danger)" : "var(--primary)"}; border-radius: 4px;"></div>
+          </div>
+          <div style="font-size: 11px; color: var(--text-muted);">
+            达到阈值 (${max}人) 后系统自动切入下一个群二维码
+          </div>
+        </div>
+      </div>
+
+      <div class="zima-card-actions-grid">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="toggleZimaStatus('${zm.id}')">
+          ${zm.status === 1 ? "⏸️ 暂停此码" : "▶️ 启用此码"}
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="resetZimaPv('${zm.id}')" title="清零该码访问量">
+          🔄 清零进客
+        </button>
+        <button type="button" class="btn btn-danger btn-sm" onclick="deleteZima('${zm.id}')">
+          🗑️ 删除此码
+        </button>
       </div>
     `;
-    container.appendChild(itemDiv);
+    container.appendChild(card);
   });
 }
 

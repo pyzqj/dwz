@@ -279,7 +279,7 @@ export default async function onRequest(context) {
       await kv.putJSON("dwz_index", dwzIndex);
     }
 
-    const shortUrl = `${url.origin}/s/${key}`;
+    const shortUrl = `${url.origin}/${key}`;
 
     if (format === "text") {
       return new Response(shortUrl, {

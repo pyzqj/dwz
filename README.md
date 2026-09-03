@@ -101,7 +101,7 @@ curl "https://你的域名/api/dwz/create?api_key=YOUR_API_KEY&url=https://examp
 ```
 **输出结果**：
 ```text
-https://你的域名/s/yg1pfj
+https://你的域名/yg1pfj
 ```
 
 ### 2. 标准 POST 请求（JSON 格式响应）
@@ -119,7 +119,7 @@ curl -X POST "https://你的域名/api/dwz/create" \
   "data": {
     "key": "yg1pfj",
     "url": "https://example.com/item/123",
-    "shortUrl": "https://你的域名/s/yg1pfj"
+    "shortUrl": "https://你的域名/yg1pfj"
   }
 }
 ```

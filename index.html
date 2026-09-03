@@ -339,8 +339,8 @@
     <!-- 1-Click Short URL Generator on Homepage -->
     <div style="width: 100%; max-width: 680px; margin: 0 auto 32px; background: rgba(255,255,255,0.04); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 20px;">
       <form id="homeDwzForm" onsubmit="handleHomeDwzSubmit(event)" style="display: flex; gap: 10px; flex-wrap: wrap;">
-        <input type="url" id="homeLongUrl" placeholder="粘贴长链接一键生成短网址 (如 https://example.com)..." required style="flex: 1; min-width: 240px; padding: 14px 18px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.15); background: rgba(15,23,42,0.7); color: #ffffff; font-size: 14px; outline: none;">
-        <button type="submit" id="homeSubmitBtn" class="btn btn-primary" style="padding: 14px 24px; font-size: 14px; white-space: nowrap;">⚡ 极速生成</button>
+        <input type="url" id="homeLongUrl" placeholder="粘贴长链接，一键生成短网址 (如 https://example.com)..." required style="flex: 1; min-width: 240px; padding: 14px 18px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.15); background: rgba(15,23,42,0.7); color: #ffffff; font-size: 14px; outline: none;">
+        <button type="submit" id="homeSubmitBtn" class="btn btn-primary" style="padding: 14px 28px; font-size: 15px; font-weight: 600; white-space: nowrap;">⚡ 一键生成短网址</button>
       </form>
 
       <div id="homeDwzResult" style="display: none; margin-top: 14px; padding: 12px 16px; background: rgba(34,197,94,0.12); border: 1px solid rgba(34,197,94,0.3); border-radius: 8px; text-align: left;">
@@ -377,7 +377,7 @@
       resultBox.style.display = "none";
       errorBox.style.display = "none";
       btn.disabled = true;
-      btn.textContent = "生成中...";
+      btn.textContent = "正在生成短网址...";
 
       try {
         const res = await fetch("/api/dwz/create", {
@@ -402,7 +402,7 @@
         errorBox.style.display = "block";
       } finally {
         btn.disabled = false;
-        btn.textContent = "⚡ 极速生成";
+        btn.textContent = "⚡ 一键生成短网址";
       }
     }
 

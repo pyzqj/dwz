@@ -221,33 +221,39 @@
             </div>
           </div>
 
-          <div class="card-table">
-            <div class="table-scroll-hint">
-              <span>👈 左右滑动查看完整操作按钮 👉</span>
-              <div style="display: inline-flex; gap: 6px; margin-left: 8px;">
-                <button type="button" class="btn btn-primary btn-sm" style="padding: 2px 8px; font-size: 11px;" onclick="scrollTableTo('dwzTableResponsive', 'right')">滑到操作区 ➡️</button>
-                <button type="button" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 11px;" onclick="scrollTableTo('dwzTableResponsive', 'left')">⬅️ 最左</button>
+          <!-- Desktop Table View -->
+          <div class="desktop-table-container">
+            <div class="card-table">
+              <div class="table-scroll-hint">
+                <span>👈 左右滑动查看完整操作按钮 👉</span>
+                <div style="display: inline-flex; gap: 6px; margin-left: 8px;">
+                  <button type="button" class="btn btn-primary btn-sm" style="padding: 2px 8px; font-size: 11px;" onclick="scrollTableTo('dwzTableResponsive', 'right')">滑到操作区 ➡️</button>
+                  <button type="button" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 11px;" onclick="scrollTableTo('dwzTableResponsive', 'left')">⬅️ 最左</button>
+                </div>
+              </div>
+              <div class="table-responsive" id="dwzTableResponsive">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>标题 / 创建时间</th>
+                      <th>短链 Key</th>
+                      <th>目标链接 (URL)</th>
+                      <th>分流模式</th>
+                      <th>总访问 / 今日</th>
+                      <th>状态</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dwzTableBody">
+                    <tr><td colspan="7" class="empty-state"><div class="empty-icon">⏳</div><p>正在加载短网址列表...</p></td></tr>
+                  </tbody>
+                </table>
               </div>
             </div>
-            <div class="table-responsive" id="dwzTableResponsive">
-              <table>
-                <thead>
-                  <tr>
-                    <th>标题 / 创建时间</th>
-                    <th>短链 Key</th>
-                    <th>目标链接 (URL)</th>
-                    <th>分流模式</th>
-                    <th>总访问 / 今日</th>
-                    <th>状态</th>
-                    <th>操作</th>
-                  </tr>
-                </thead>
-                <tbody id="dwzTableBody">
-                  <tr><td colspan="7" class="empty-state"><div class="empty-icon">⏳</div><p>正在加载短网址列表...</p></td></tr>
-                </tbody>
-              </table>
-            </div>
           </div>
+
+          <!-- Mobile Cards View (Active automatically on screens < 820px) -->
+          <div class="mobile-cards-container" id="dwzMobileCardsContainer"></div>
         </section>
 
         <!-- Tab 3: Group Live Code Management -->
@@ -259,32 +265,38 @@
             <button class="btn btn-primary" onclick="openCreateQunModal()">+ 新建群活码 (一站式配置)</button>
           </div>
 
-          <div class="card-table">
-            <div class="table-scroll-hint">
-              <span>👈 左右滑动查看完整操作按钮 👉</span>
-              <div style="display: inline-flex; gap: 6px; margin-left: 8px;">
-                <button type="button" class="btn btn-primary btn-sm" style="padding: 2px 8px; font-size: 11px;" onclick="scrollTableTo('qunTableResponsive', 'right')">滑到操作区 ➡️</button>
-                <button type="button" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 11px;" onclick="scrollTableTo('qunTableResponsive', 'left')">⬅️ 最左</button>
+          <!-- Desktop Table View -->
+          <div class="desktop-table-container">
+            <div class="card-table">
+              <div class="table-scroll-hint">
+                <span>👈 左右滑动查看完整操作按钮 👉</span>
+                <div style="display: inline-flex; gap: 6px; margin-left: 8px;">
+                  <button type="button" class="btn btn-primary btn-sm" style="padding: 2px 8px; font-size: 11px;" onclick="scrollTableTo('qunTableResponsive', 'right')">滑到操作区 ➡️</button>
+                  <button type="button" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 11px;" onclick="scrollTableTo('qunTableResponsive', 'left')">⬅️ 最左</button>
+                </div>
+              </div>
+              <div class="table-responsive" id="qunTableResponsive">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>群活码名称 / ID</th>
+                      <th>子码池状态</th>
+                      <th>安全机制</th>
+                      <th>总访问 / 今日</th>
+                      <th>状态</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="qunTableBody">
+                    <tr><td colspan="6" class="empty-state"><div class="empty-icon">⏳</div><p>正在加载群活码列表...</p></td></tr>
+                  </tbody>
+                </table>
               </div>
             </div>
-            <div class="table-responsive" id="qunTableResponsive">
-              <table>
-                <thead>
-                  <tr>
-                    <th>群活码名称 / ID</th>
-                    <th>子码池状态</th>
-                    <th>安全机制</th>
-                    <th>总访问 / 今日</th>
-                    <th>状态</th>
-                    <th>操作</th>
-                  </tr>
-                </thead>
-                <tbody id="qunTableBody">
-                  <tr><td colspan="6" class="empty-state"><div class="empty-icon">⏳</div><p>正在加载群活码列表...</p></td></tr>
-                </tbody>
-              </table>
-            </div>
           </div>
+
+          <!-- Mobile Cards View (Active automatically on screens < 820px) -->
+          <div class="mobile-cards-container" id="qunMobileCardsContainer"></div>
         </section>
 
         <!-- Tab 4: Blob Materials Library -->
