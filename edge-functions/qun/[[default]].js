@@ -376,10 +376,32 @@ export default async function onRequest(context) {
     }
   }
 
-  // Save updated PV counts to KV
-  context.waitUntil
-    ? context.waitUntil(kv.putJSON(`qun_data_${qid}`, qunItem))
-    : await kv.putJSON(`qun_data_${qid}`, qunItem);
+  // Save updated PV counts safely: re-read fresh item to avoid overwriting deleted subcodes
+  const updatePvSafe = async () => {
+    try {
+      const freshItem = await kv.getJSON(`qun_data_${qid}`);
+      if (freshItem) {
+        freshItem.pv = (freshItem.pv || 0) + 1;
+        const todayStr = getTodayString();
+        if (freshItem.today_pv && freshItem.today_pv.date === todayStr) {
+          freshItem.today_pv.pv = (freshItem.today_pv.pv || 0) + 1;
+        } else {
+          freshItem.today_pv = { pv: 1, date: todayStr };
+        }
+        if (selectedZima && Array.isArray(freshItem.zima)) {
+          const freshZm = freshItem.zima.find((z) => String(z.id || "").trim() === String(selectedZima.id || "").trim());
+          if (freshZm) {
+            freshZm.pv = (freshZm.pv || 0) + 1;
+          }
+        }
+        await kv.putJSON(`qun_data_${qid}`, freshItem);
+      }
+    } catch (e) {
+      // Non-blocking
+    }
+  };
+
+  context.waitUntil ? context.waitUntil(updatePvSafe()) : await updatePvSafe();
 
   // 3. If a valid subcode was found
   if (selectedZima) {

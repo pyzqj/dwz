@@ -722,10 +722,11 @@ export default async function onRequest(context) {
     const qunItem = await kv.getJSON(`qun_data_${qun_id}`);
     if (!qunItem || !Array.isArray(qunItem.zima)) return jsonResponse({ code: 404, msg: "群或子码不存在" }, 404);
 
-    const zm = qunItem.zima.find((z) => z.id === zm_id);
+    const targetId = String(zm_id || "").trim();
+    const zm = qunItem.zima.find((z) => String(z.id || "").trim() === targetId || String(z.qrcode || "").trim() === targetId);
     if (!zm) return jsonResponse({ code: 404, msg: "子码不存在" }, 404);
 
-    zm.status = zm.status === 1 ? 2 : 1;
+    zm.status = zm.status === 1 ? 0 : 1;
     await kv.putJSON(`qun_data_${qun_id}`, qunItem);
 
     return jsonResponse({ code: 200, msg: zm.status === 1 ? "已启用该子码" : "已暂停该子码" });
@@ -736,10 +737,16 @@ export default async function onRequest(context) {
     const qunItem = await kv.getJSON(`qun_data_${qun_id}`);
     if (!qunItem || !Array.isArray(qunItem.zima)) return jsonResponse({ code: 404, msg: "群或子码不存在" }, 404);
 
-    qunItem.zima = qunItem.zima.filter((z) => z.id !== zm_id);
+    const targetId = String(zm_id || "").trim();
+    const beforeCount = qunItem.zima.length;
+    qunItem.zima = qunItem.zima.filter((z) => {
+      const zid = String(z.id || "").trim();
+      const zqr = String(z.qrcode || "").trim();
+      return zid !== targetId && zqr !== targetId;
+    });
     await kv.putJSON(`qun_data_${qun_id}`, qunItem);
 
-    return jsonResponse({ code: 200, msg: "子码删除成功" });
+    return jsonResponse({ code: 200, msg: "子码删除成功", data: { beforeCount, afterCount: qunItem.zima.length } });
   }
 
   if (path === "/qun/zima/reset-pv" && method === "POST") {
@@ -747,7 +754,8 @@ export default async function onRequest(context) {
     const qunItem = await kv.getJSON(`qun_data_${qun_id}`);
     if (!qunItem || !Array.isArray(qunItem.zima)) return jsonResponse({ code: 404, msg: "群或子码不存在" }, 404);
 
-    const zm = qunItem.zima.find((z) => z.id === zm_id);
+    const targetId = String(zm_id || "").trim();
+    const zm = qunItem.zima.find((z) => String(z.id || "").trim() === targetId || String(z.qrcode || "").trim() === targetId);
     if (!zm) return jsonResponse({ code: 404, msg: "子码不存在" }, 404);
 
     zm.pv = 0;
