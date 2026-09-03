@@ -21,7 +21,7 @@
     <div class="auth-card">
       <div class="logo-badge">⚡</div>
       <h2>EdgeLink 控制台</h2>
-      <p>智能短网址 & 微信群活码调度系统</p>
+      <div id="loginErrorAlert" class="login-error-alert" style="display: none;"></div>
       
       <form id="loginForm" onsubmit="handleLogin(event)">
         <div class="form-group" style="text-align: left;">
@@ -395,8 +395,9 @@
 
         <div id="resultModalCanvas" style="margin: 8px auto; padding: 10px; background: #fff; border-radius: 12px; border: 1px solid #e2e8f0;"></div>
       </div>
-      <div class="modal-footer" style="justify-content: center; gap: 12px;">
+      <div class="modal-footer" style="justify-content: center; gap: 10px; flex-wrap: wrap;">
         <button type="button" class="btn btn-primary" onclick="copyText(document.getElementById('resultModalShortUrl').textContent)">📋 再次复制链接</button>
+        <button type="button" class="btn btn-primary" style="background: var(--success); border-color: var(--success);" onclick="downloadQrCode('resultModalCanvas', '短网址二维码')">📥 下载二维码</button>
         <button type="button" class="btn btn-secondary" onclick="closeModal('generatedResultModal')">完成</button>
       </div>
     </div>
@@ -587,8 +588,9 @@
         <div id="qrModalCanvas" style="margin: 16px auto; padding: 12px; background: #fff; border-radius: 12px; border: 1px solid #e2e8f0;"></div>
         <div id="qrModalLinkText" style="font-size: 12px; color: var(--text-muted); word-break: break-all; margin-top: 8px;"></div>
       </div>
-      <div class="modal-footer" style="justify-content: center;">
-        <button type="button" class="btn btn-primary" onclick="copyText(document.getElementById('qrModalLinkText').textContent)">复制链接</button>
+      <div class="modal-footer" style="justify-content: center; gap: 10px; flex-wrap: wrap;">
+        <button type="button" class="btn btn-primary" onclick="copyText(document.getElementById('qrModalLinkText').textContent)">📋 复制链接</button>
+        <button type="button" class="btn btn-primary" style="background: var(--success); border-color: var(--success);" onclick="downloadQrCode('qrModalCanvas', document.getElementById('qrModalTitle').textContent || '群活码二维码')">📥 下载二维码</button>
         <button type="button" class="btn btn-secondary" onclick="closeModal('qrModal')">关闭</button>
       </div>
     </div>

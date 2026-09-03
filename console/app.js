@@ -96,9 +96,12 @@ async function apiRequest(endpoint, method = "GET", body = null) {
     }
 
     if (res.status === 401) {
-      STATE.isLoggedIn = false;
-      document.getElementById("authOverlay").style.display = "flex";
-      return null;
+      if (!endpoint.includes("/login")) {
+        STATE.isLoggedIn = false;
+        document.getElementById("authOverlay").style.display = "flex";
+        document.getElementById("appContainer").style.display = "none";
+        return null;
+      }
     }
 
     const contentType = res.headers.get("content-type") || "";
@@ -131,7 +134,7 @@ function switchTab(tabId) {
     overview: "概览面板",
     dwz: "短网址管理",
     qun: "群活码管理",
-    blob: "Blob 素材库",
+    blob: "素材库",
     api: "开放 API 文档",
     settings: "系统设置",
   };
@@ -161,6 +164,34 @@ function copyText(text) {
   }
 }
 
+// Download QR Code Image
+function downloadQrCode(containerId, filename = "qrcode.png") {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const img = container.querySelector("img");
+  const canvas = container.querySelector("canvas");
+  let dataUrl = "";
+  if (img && img.src && img.src.startsWith("data:")) {
+    dataUrl = img.src;
+  } else if (canvas) {
+    dataUrl = canvas.toDataURL("image/png");
+  } else if (img && img.src) {
+    dataUrl = img.src;
+  }
+  if (!dataUrl) {
+    showToast("二维码生成中，请稍后再试", "error");
+    return;
+  }
+  const a = document.createElement("a");
+  a.href = dataUrl;
+  const cleanName = filename.replace(/[/\\?%*:|"<>]/g, "_");
+  a.download = cleanName.endsWith(".png") ? cleanName : `${cleanName}.png`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  showToast("已开始下载二维码图片！");
+}
+
 // -------------------------------------------------------------
 // Auth Logic
 // -------------------------------------------------------------
@@ -182,10 +213,17 @@ async function checkAuth() {
 
 async function handleLogin(e) {
   e.preventDefault();
+  const alertBox = document.getElementById("loginErrorAlert");
+  if (alertBox) alertBox.style.display = "none";
+
   const username = document.getElementById("loginUsername").value.trim();
   const password = document.getElementById("loginPassword").value.trim();
 
   if (!username || !password) {
+    if (alertBox) {
+      alertBox.innerHTML = "<span>⚠️</span><span>请输入管理员账号和密码</span>";
+      alertBox.style.display = "flex";
+    }
     showToast("请输入管理员账号和密码", "error");
     return;
   }
@@ -200,9 +238,15 @@ async function handleLogin(e) {
     document.getElementById("authOverlay").style.display = "none";
     document.getElementById("appContainer").style.display = "flex";
     document.getElementById("headerUsername").textContent = STATE.username;
+    if (alertBox) alertBox.style.display = "none";
     loadOverview();
   } else {
-    showToast(res?.msg || "账号或密码错误", "error");
+    const errorMsg = res?.msg || "账号或密码错误，请重新输入";
+    if (alertBox) {
+      alertBox.innerHTML = `<span>❌</span><span>${errorMsg}</span>`;
+      alertBox.style.display = "flex";
+    }
+    showToast(errorMsg, "error");
   }
 }
 
@@ -603,6 +647,9 @@ function filterQun() {
 // Open Unified Create Modal
 function openCreateQunModal() {
   STATE.newQunSubcodes = [];
+  const wrapper = document.getElementById("newQunSubcodesWrapper");
+  if (wrapper) wrapper.style.display = "block";
+
   document.getElementById("qunModalTitle").textContent = "新建微信群活码 (一站式配置)";
   document.getElementById("qunFormId").value = "";
   document.getElementById("qunFormTitle").value = "";
@@ -622,38 +669,41 @@ function renderNewQunSubcodeList() {
 
   if (STATE.newQunSubcodes.length === 0) {
     container.innerHTML = `
-      <div style="border: 2px dashed #cbd5e1; padding: 20px; border-radius: 10px; text-align: center; background: #f8fafc; color: #64748b;">
-        <div style="font-size: 28px; margin-bottom: 6px;">📷</div>
-        <div style="font-size: 13px; font-weight: 600;">暂未添加微信群二维码</div>
-        <div style="font-size: 12px; color: #94a3b8; margin-top: 4px;">点击下方按钮可选择图片（支持一次选多张群二维码批量添加）</div>
-      </div>
+      <label for="groupBatchFileInput" class="subcode-dropzone">
+        <div style="font-size: 32px; color: var(--primary);">📷</div>
+        <strong style="font-size: 14px; color: var(--text-main);">点击此处上传微信群二维码</strong>
+        <span style="font-size: 12px; color: var(--text-muted);">支持批量多选图片，系统将自动依次排入轮换顺位</span>
+        <span class="btn btn-primary btn-sm" style="margin-top: 6px; pointer-events: none;">+ 选择群二维码图片</span>
+      </label>
     `;
     return;
   }
 
   STATE.newQunSubcodes.forEach((item, index) => {
     const card = document.createElement("div");
-    card.style.cssText = `
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      padding: 12px;
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      margin-bottom: 10px;
-    `;
+    card.className = "subcode-card-item";
     card.innerHTML = `
-      <img src="${item.qrcode}" style="width: 56px; height: 56px; object-fit: contain; border-radius: 6px; border: 1px solid #e2e8f0; background: #f8fafc;">
-      <div style="flex: 1;">
-        <div style="font-size: 13px; font-weight: 700;">第 ${index + 1} 顺位群码</div>
-        <div style="display: flex; gap: 10px; margin-top: 6px; align-items: center;">
-          <label style="font-size: 12px; color: #64748b;">进群阈值人数:</label>
-          <input type="number" value="${item.max_num}" min="1" max="500" style="width: 80px; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px;" onchange="updateNewSubcodeThreshold(${index}, this.value)">
-          <input type="text" value="${item.leader || ''}" placeholder="群主微信号(可选)" style="flex: 1; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px;" onchange="updateNewSubcodeLeader(${index}, this.value)">
+      <div class="subcode-thumb-box">
+        <img src="${item.qrcode}" class="subcode-thumb-img">
+        <span class="subcode-order-badge">#${index + 1}</span>
+      </div>
+      <div class="subcode-content-box">
+        <div class="subcode-card-header">
+          <strong style="font-size: 13px;">第 ${index + 1} 顺位群码</strong>
+          <span class="badge badge-success" style="font-size: 11px;">生效中</span>
+        </div>
+        <div class="subcode-fields-grid">
+          <div>
+            <label class="subcode-field-label">进群上限阈值 (满额自动切码)</label>
+            <input type="number" class="subcode-input" value="${item.max_num}" min="1" max="500" placeholder="默认200人" onchange="updateNewSubcodeThreshold(${index}, this.value)">
+          </div>
+          <div>
+            <label class="subcode-field-label">群主微信号 (失效备用)</label>
+            <input type="text" class="subcode-input" value="${item.leader || ''}" placeholder="选填，如 wxid_xxx" onchange="updateNewSubcodeLeader(${index}, this.value)">
+          </div>
         </div>
       </div>
-      <button type="button" class="btn btn-danger btn-sm" onclick="removeNewSubcode(${index})">删除</button>
+      <button type="button" class="btn btn-danger btn-sm" style="align-self: center;" onclick="removeNewSubcode(${index})" title="移除此群码">🗑️ 移除</button>
     `;
     container.appendChild(card);
   });
