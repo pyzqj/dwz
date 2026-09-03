@@ -53,13 +53,26 @@ function renderMessagePage(title, message, subtext = "") {
 </html>`,
     {
       status: 200,
-      headers: { "Content-Type": "text/html; charset=utf-8" },
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0, s-maxage=0",
+        "Pragma": "no-cache",
+        "Expires": "0",
+        "CDN-Cache-Control": "no-store",
+      },
     }
   );
 }
 
 function renderQunPage(qunItem, activeZima, isKfFallback = false, cookieHeaderToSet = null) {
-  const qrImage = isKfFallback ? qunItem.kf_qrcode : activeZima ? activeZima.qrcode : "";
+  const rawQrImage = isKfFallback ? qunItem.kf_qrcode : activeZima ? activeZima.qrcode : "";
+  // Append dynamic timestamp to QR code image to force WeChat and Safari to bypass image cache
+  const qrImage = rawQrImage
+    ? rawQrImage.includes("?")
+      ? `${rawQrImage}&_t=${Date.now()}`
+      : `${rawQrImage}?_t=${Date.now()}`
+    : "";
+
   const subtitle = isKfFallback
     ? "当前群已满员，请扫描下方客服二维码协助进群"
     : "微信扫一扫或长按二维码加入群聊";
@@ -72,6 +85,9 @@ function renderQunPage(qunItem, activeZima, isKfFallback = false, cookieHeaderTo
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, viewport-fit=cover">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>${qunItem.title || "微信群聊邀请"}</title>
   <link rel="shortcut icon" href="https://res.wx.qq.com/a/wx_fed/assets/res/NTI4MWU5.ico">
   <style>
@@ -277,6 +293,11 @@ function renderQunPage(qunItem, activeZima, isKfFallback = false, cookieHeaderTo
 
   const headers = {
     "Content-Type": "text/html; charset=utf-8",
+    "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0, s-maxage=0",
+    "Pragma": "no-cache",
+    "Expires": "0",
+    "Surrogate-Control": "no-store",
+    "CDN-Cache-Control": "no-store",
   };
   if (cookieHeaderToSet) {
     headers["Set-Cookie"] = cookieHeaderToSet;
@@ -320,8 +341,8 @@ export default async function onRequest(context) {
   let cookieHeaderToSet = null;
 
   // 1. Check deduplication (7-day cookie)
+  const cookieHeader = request.headers.get("Cookie") || request.headers.get("cookie") || "";
   if (qunItem.qc === 1) {
-    const cookieHeader = request.headers.get("Cookie") || request.headers.get("cookie") || "";
     const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)qun_qc_${qid}=([^;]+)`));
     if (match) {
       const cachedZmid = match[1].trim();
@@ -329,6 +350,11 @@ export default async function onRequest(context) {
       if (foundZima) {
         selectedZima = foundZima;
       }
+    }
+  } else {
+    // If deduplication is turned OFF, actively delete any existing 7-day cookie from client browser!
+    if (cookieHeader.includes(`qun_qc_${qid}`)) {
+      cookieHeaderToSet = `qun_qc_${qid}=; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT`;
     }
   }
 

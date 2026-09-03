@@ -1505,6 +1505,9 @@ function scrollTableTo(containerId, direction) {
 }
 
 function initTableScrollDrag() {
+  // Only attach mouse drag scroll on desktop devices with fine pointer (mouse)
+  if (!window.matchMedia || !window.matchMedia("(pointer: fine)").matches) return;
+
   document.querySelectorAll(".table-responsive").forEach((container) => {
     let isDown = false;
     let startX = 0;
